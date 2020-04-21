@@ -65,7 +65,7 @@ viewMain = do
    print daatta
 
    --gmshFltkRun
-   if daatta /= ("NodeData", [1,2,3,4,5], field, 0, 3)
+   if daatta /= ("NodeData", [1,2,3,4,5], reverse field, 0, 3)
       then error "ViewTest failed"
       else print "ViewTest Ok"
 

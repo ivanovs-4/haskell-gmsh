@@ -5,7 +5,11 @@ let
       haskellPackages = pkgs.haskellPackages.override { overrides = haskOverrides; };
 
       gmsh = pkgs.gmsh.overrideAttrs (old: {
-        cmakeFlags = old.cmakeFlags or [] ++ [ "-DENABLE_BUILD_LIB=1" "-DENABLE_BUILD_SHARED=1" ];
+        cmakeFlags = old.cmakeFlags or [] ++ [
+          "-DENABLE_BUILD_LIB=1"
+          "-DENABLE_BUILD_SHARED=1"
+          "-DENABLE_OPENMP=1"
+        ];
       });
 
     };

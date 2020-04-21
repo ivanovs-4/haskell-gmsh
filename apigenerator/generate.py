@@ -5,7 +5,7 @@ import sys
 
 
 # the tag of the version the API which you want to generate
-api_version = "gmsh_4_4_1"
+api_version = "gmsh_4_5_6"
 
 base = f"https://gitlab.onelab.info/gmsh/gmsh/raw/{api_version}/"
 

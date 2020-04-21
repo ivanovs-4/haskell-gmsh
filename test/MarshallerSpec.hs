@@ -29,13 +29,13 @@ withPeekArrayArrayTest withF peekF lstlst' = monadicIO $ do
 spec :: Spec
 spec = do
    describe "withArrayArrayDoubleLen/peekArrayArrayDouble" $ do
-      it "withArrayArrayDoubleLen -> peekArrayArrayDouble is id" $ property $ test
-      where
+      let
          test :: NonEmptyList (NonEmptyList Double) -> Property
          test = withPeekArrayArrayTest withArrayArrayDoubleLen peekArrayArrayDouble
+      it "withArrayArrayDoubleLen -> peekArrayArrayDouble is id" $ property $ test
 
    describe "withArrayArrayInt/peekArrayArrayInt" $ do
-      it "withArrayArrayIntLen -> peekArrayArrayInt is id" $ property $ test
-      where
+      let
          test :: NonEmptyList (NonEmptyList Int) -> Property
          test = withPeekArrayArrayTest withArrayArrayIntLen peekArrayArrayInt
+      it "withArrayArrayIntLen -> peekArrayArrayInt is id" $ property $ test

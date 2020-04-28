@@ -239,6 +239,18 @@ checkErrorCodeAndThrow funname errptr = do
       then return ()
       else error $ funname ++ " returned nonzero error code: " ++ show errcode
 
+
+
+----------------------
+-- top-level functions
+----------------------
+
+-- Initialize Gmsh. This must be called before any call to the other
+-- functions in the API. If `argc' and `argv' (or just `argv' in
+-- Python or Julia) are provided, they will be handled in the same way
+-- as the command line arguments in the Gmsh app. If `readConfigFiles'
+-- is set, read system Gmsh configuration files (gmshrc and
+-- gmsh-options).
 gmshInitialize :: [String] -> Maybe Bool -> IO()
 gmshInitialize argv readConfigFilesMaybe = do
    let argc' = fromIntegral $ length argv
@@ -256,6 +268,9 @@ foreign import ccall safe "gmshc.h gmshInitialize"
       -> CBool
       -> Ptr CInt
       -> IO()
+
+-- Finalize Gmsh. This must be called when you are done using the Gmsh
+-- API.
 gmshFinalize :: IO()
 gmshFinalize = do
    alloca $ \errptr -> do
@@ -266,6 +281,10 @@ foreign import ccall safe "gmshc.h gmshFinalize"
    cgmshFinalize
       :: Ptr CInt
       -> IO()
+
+-- Open a file. Equivalent to the `File->Open' menu in the Gmsh app.
+-- Handling of the file depends on its extension and/or its contents:
+-- opening a file with model data will create a new model.
 gmshOpen :: String -> IO()
 gmshOpen fileName = do
    withCString fileName $ \fileName' -> do
@@ -278,6 +297,11 @@ foreign import ccall safe "gmshc.h gmshOpen"
       :: CString
       -> Ptr CInt
       -> IO()
+
+-- Merge a file. Equivalent to the `File->Merge' menu in the Gmsh app.
+-- Handling of the file depends on its extension and/or its contents.
+-- Merging a file with model data will add the data to the current
+-- model.
 gmshMerge :: String -> IO()
 gmshMerge fileName = do
    withCString fileName $ \fileName' -> do
@@ -290,6 +314,9 @@ foreign import ccall safe "gmshc.h gmshMerge"
       :: CString
       -> Ptr CInt
       -> IO()
+
+-- Write a file. The export format is determined by the file
+-- extension.
 gmshWrite :: String -> IO()
 gmshWrite fileName = do
    withCString fileName $ \fileName' -> do
@@ -302,6 +329,9 @@ foreign import ccall safe "gmshc.h gmshWrite"
       :: CString
       -> Ptr CInt
       -> IO()
+
+-- Clear all loaded models and post-processing data, and add a new
+-- empty model.
 gmshClear :: IO()
 gmshClear = do
    alloca $ \errptr -> do
@@ -312,6 +342,15 @@ foreign import ccall safe "gmshc.h gmshClear"
    cgmshClear
       :: Ptr CInt
       -> IO()
+
+
+----------------------------
+-- option handling functions
+----------------------------
+
+-- Set a numerical option to `value'. `name' is of the form
+-- "category.option" or "category[num].option". Available categories
+-- and options are listed in the Gmsh reference manual.
 gmshOptionSetNumber :: String -> Double -> IO()
 gmshOptionSetNumber name value = do
    withCString name $ \name' -> do
@@ -326,6 +365,10 @@ foreign import ccall safe "gmshc.h gmshOptionSetNumber"
       -> CDouble
       -> Ptr CInt
       -> IO()
+
+-- Get the `value' of a numerical option. `name' is of the form
+-- "category.option" or "category[num].option". Available categories
+-- and options are listed in the Gmsh reference manual.
 gmshOptionGetNumber :: String -> IO(Double)
 gmshOptionGetNumber name = do
    withCString name $ \name' -> do
@@ -342,6 +385,10 @@ foreign import ccall safe "gmshc.h gmshOptionGetNumber"
       -> Ptr CDouble
       -> Ptr CInt
       -> IO()
+
+-- Set a string option to `value'. `name' is of the form
+-- "category.option" or "category[num].option". Available categories
+-- and options are listed in the Gmsh reference manual.
 gmshOptionSetString :: String -> String -> IO()
 gmshOptionSetString name value = do
    withCString name $ \name' -> do
@@ -356,6 +403,10 @@ foreign import ccall safe "gmshc.h gmshOptionSetString"
       -> CString
       -> Ptr CInt
       -> IO()
+
+-- Get the `value' of a string option. `name' is of the form
+-- "category.option" or "category[num].option". Available categories
+-- and options are listed in the Gmsh reference manual.
 gmshOptionGetString :: String -> IO(String)
 gmshOptionGetString name = do
    withCString name $ \name' -> do
@@ -372,6 +423,12 @@ foreign import ccall safe "gmshc.h gmshOptionGetString"
       -> Ptr CString
       -> Ptr CInt
       -> IO()
+
+-- Set a color option to the RGBA value (`r', `g', `b', `a'), where
+-- where `r', `g', `b' and `a' should be integers between 0 and 255.
+-- `name' is of the form "category.option" or "category[num].option".
+-- Available categories and options are listed in the Gmsh reference
+-- manual, with the "Color." middle string removed.
 gmshOptionSetColor :: String -> Int -> Int -> Int -> Maybe Int -> IO()
 gmshOptionSetColor name r g b aMaybe = do
    withCString name $ \name' -> do
@@ -393,6 +450,11 @@ foreign import ccall safe "gmshc.h gmshOptionSetColor"
       -> CInt
       -> Ptr CInt
       -> IO()
+
+-- Get the `r', `g', `b', `a' value of a color option. `name' is of
+-- the form "category.option" or "category[num].option". Available
+-- categories and options are listed in the Gmsh reference manual,
+-- with the "Color." middle string removed.
 gmshOptionGetColor :: String -> IO(Int, Int, Int, Int)
 gmshOptionGetColor name = do
    withCString name $ \name' -> do
@@ -421,6 +483,13 @@ foreign import ccall safe "gmshc.h gmshOptionGetColor"
       -> Ptr CInt
       -> Ptr CInt
       -> IO()
+
+
+------------------
+-- model functions
+------------------
+
+-- Add a new model, with name `name', and set it as the current model.
 gmshModelAdd :: String -> IO()
 gmshModelAdd name = do
    withCString name $ \name' -> do
@@ -433,6 +502,8 @@ foreign import ccall safe "gmshc.h gmshModelAdd"
       :: CString
       -> Ptr CInt
       -> IO()
+
+-- Remove the current model.
 gmshModelRemove :: IO()
 gmshModelRemove = do
    alloca $ \errptr -> do
@@ -443,6 +514,8 @@ foreign import ccall safe "gmshc.h gmshModelRemove"
    cgmshModelRemove
       :: Ptr CInt
       -> IO()
+
+-- List the names of all models.
 gmshModelList :: IO([String])
 gmshModelList = do
    alloca $ \names' -> do
@@ -458,6 +531,8 @@ foreign import ccall safe "gmshc.h gmshModelList"
       -> Ptr CSize
       -> Ptr CInt
       -> IO()
+
+-- Get the name of the current model.
 gmshModelGetCurrent :: IO(String)
 gmshModelGetCurrent = do
    alloca $ \name' -> do
@@ -472,6 +547,9 @@ foreign import ccall safe "gmshc.h gmshModelGetCurrent"
       :: Ptr CString
       -> Ptr CInt
       -> IO()
+
+-- Set the current model to the model with name `name'. If several
+-- models have the same name, select the one that was added first.
 gmshModelSetCurrent :: String -> IO()
 gmshModelSetCurrent name = do
    withCString name $ \name' -> do
@@ -484,6 +562,11 @@ foreign import ccall safe "gmshc.h gmshModelSetCurrent"
       :: CString
       -> Ptr CInt
       -> IO()
+
+-- Get all the entities in the current model. If `dim' is >= 0, return
+-- only the entities of the specified dimension (e.g. points if `dim'
+-- == 0). The entities are returned as a vector of (dim, tag) integer
+-- pairs.
 gmshModelGetEntities :: Maybe Int -> IO([(Int,Int)])
 gmshModelGetEntities dimMaybe = do
    let dim = fromMaybe (-1) dimMaybe
@@ -502,6 +585,8 @@ foreign import ccall safe "gmshc.h gmshModelGetEntities"
       -> CInt
       -> Ptr CInt
       -> IO()
+
+-- Set the name of the entity of dimension `dim' and tag `tag'.
 gmshModelSetEntityName :: Int -> Int -> String -> IO()
 gmshModelSetEntityName dim tag name = do
    let dim' = fromIntegral dim
@@ -518,6 +603,8 @@ foreign import ccall safe "gmshc.h gmshModelSetEntityName"
       -> CString
       -> Ptr CInt
       -> IO()
+
+-- Get the name of the entity of dimension `dim' and tag `tag'.
 gmshModelGetEntityName :: Int -> Int -> IO(String)
 gmshModelGetEntityName dim tag = do
    let dim' = fromIntegral dim
@@ -536,6 +623,11 @@ foreign import ccall safe "gmshc.h gmshModelGetEntityName"
       -> Ptr CString
       -> Ptr CInt
       -> IO()
+
+-- Get all the physical groups in the current model. If `dim' is >= 0,
+-- return only the entities of the specified dimension (e.g. physical
+-- points if `dim' == 0). The entities are returned as a vector of
+-- (dim, tag) integer pairs.
 gmshModelGetPhysicalGroups :: Maybe Int -> IO([(Int,Int)])
 gmshModelGetPhysicalGroups dimMaybe = do
    let dim = fromMaybe (-1) dimMaybe
@@ -554,6 +646,9 @@ foreign import ccall safe "gmshc.h gmshModelGetPhysicalGroups"
       -> CInt
       -> Ptr CInt
       -> IO()
+
+-- Get the tags of the model entities making up the physical group of
+-- dimension `dim' and tag `tag'.
 gmshModelGetEntitiesForPhysicalGroup :: Int -> Int -> IO([Int])
 gmshModelGetEntitiesForPhysicalGroup dim tag = do
    let dim' = fromIntegral dim
@@ -573,6 +668,9 @@ foreign import ccall safe "gmshc.h gmshModelGetEntitiesForPhysicalGroup"
       -> Ptr CSize
       -> Ptr CInt
       -> IO()
+
+-- Get the tags of the physical groups (if any) to which the model
+-- entity of dimension `dim' and tag `tag' belongs.
 gmshModelGetPhysicalGroupsForEntity :: Int -> Int -> IO([Int])
 gmshModelGetPhysicalGroupsForEntity dim tag = do
    let dim' = fromIntegral dim
@@ -592,6 +690,10 @@ foreign import ccall safe "gmshc.h gmshModelGetPhysicalGroupsForEntity"
       -> Ptr CSize
       -> Ptr CInt
       -> IO()
+
+-- Add a physical group of dimension `dim', grouping the model
+-- entities with tags `tags'. Return the tag of the physical group,
+-- equal to `tag' if `tag' is positive, or a new tag if `tag' < 0.
 gmshModelAddPhysicalGroup :: Int -> [Int] -> Maybe Int -> IO(Int)
 gmshModelAddPhysicalGroup dim tags tagMaybe = do
    let dim' = fromIntegral dim
@@ -611,6 +713,9 @@ foreign import ccall safe "gmshc.h gmshModelAddPhysicalGroup"
       -> CInt
       -> Ptr CInt
       -> IO(CInt)
+
+-- Set the name of the physical group of dimension `dim' and tag
+-- `tag'.
 gmshModelSetPhysicalName :: Int -> Int -> String -> IO()
 gmshModelSetPhysicalName dim tag name = do
    let dim' = fromIntegral dim
@@ -627,6 +732,9 @@ foreign import ccall safe "gmshc.h gmshModelSetPhysicalName"
       -> CString
       -> Ptr CInt
       -> IO()
+
+-- Get the name of the physical group of dimension `dim' and tag
+-- `tag'.
 gmshModelGetPhysicalName :: Int -> Int -> IO(String)
 gmshModelGetPhysicalName dim tag = do
    let dim' = fromIntegral dim
@@ -645,6 +753,14 @@ foreign import ccall safe "gmshc.h gmshModelGetPhysicalName"
       -> Ptr CString
       -> Ptr CInt
       -> IO()
+
+-- Get the boundary of the model entities `dimTags'. Return in
+-- `outDimTags' the boundary of the individual entities (if `combined'
+-- is false) or the boundary of the combined geometrical shape formed
+-- by all input entities (if `combined' is true). Return tags
+-- multiplied by the sign of the boundary entity if `oriented' is
+-- true. Apply the boundary operator recursively down to dimension 0
+-- (i.e. to points) if `recursive' is true.
 gmshModelGetBoundary :: [(Int, Int)] -> Maybe Bool -> Maybe Bool -> Maybe Bool -> IO([(Int,Int)])
 gmshModelGetBoundary dimTags combinedMaybe orientedMaybe recursiveMaybe = do
    withArrayPairLen dimTags $ \dimTags_n' dimTags' -> do
@@ -672,6 +788,11 @@ foreign import ccall safe "gmshc.h gmshModelGetBoundary"
       -> CBool
       -> Ptr CInt
       -> IO()
+
+-- Get the model entities in the bounding box defined by the two
+-- points (`xmin', `ymin', `zmin') and (`xmax', `ymax', `zmax'). If
+-- `dim' is >= 0, return only the entities of the specified dimension
+-- (e.g. points if `dim' == 0).
 gmshModelGetEntitiesInBoundingBox :: Double -> Double -> Double -> Double -> Double -> Double -> Maybe Int -> IO([(Int,Int)])
 gmshModelGetEntitiesInBoundingBox xmin ymin zmin xmax ymax zmax dimMaybe = do
    let xmin' = realToFrac xmin
@@ -702,6 +823,11 @@ foreign import ccall safe "gmshc.h gmshModelGetEntitiesInBoundingBox"
       -> CInt
       -> Ptr CInt
       -> IO()
+
+-- Get the bounding box (`xmin', `ymin', `zmin'), (`xmax', `ymax',
+-- `zmax') of the model entity of dimension `dim' and tag `tag'. If
+-- `dim' and `tag' are negative, get the bounding box of the whole
+-- model.
 gmshModelGetBoundingBox :: Int -> Int -> IO(Double, Double, Double, Double, Double, Double)
 gmshModelGetBoundingBox dim tag = do
    let dim' = fromIntegral dim
@@ -740,6 +866,8 @@ foreign import ccall safe "gmshc.h gmshModelGetBoundingBox"
       -> Ptr CDouble
       -> Ptr CInt
       -> IO()
+
+-- Get the geometrical dimension of the current model.
 gmshModelGetDimension :: IO(Int)
 gmshModelGetDimension = do
    alloca $ \errptr -> do
@@ -751,6 +879,13 @@ foreign import ccall safe "gmshc.h gmshModelGetDimension"
    cgmshModelGetDimension
       :: Ptr CInt
       -> IO(CInt)
+
+-- Add a discrete model entity (defined by a mesh) of dimension `dim'
+-- in the current model. Return the tag of the new discrete entity,
+-- equal to `tag' if `tag' is positive, or a new tag if `tag' < 0.
+-- `boundary' specifies the tags of the entities on the boundary of
+-- the discrete entity, if any. Specifying `boundary' allows Gmsh to
+-- construct the topology of the overall model.
 gmshModelAddDiscreteEntity :: Int -> Maybe Int -> Maybe [Int] -> IO(Int)
 gmshModelAddDiscreteEntity dim tagMaybe boundaryMaybe = do
    let dim' = fromIntegral dim
@@ -771,6 +906,10 @@ foreign import ccall safe "gmshc.h gmshModelAddDiscreteEntity"
       -> CSize
       -> Ptr CInt
       -> IO(CInt)
+
+-- Remove the entities `dimTags' of the current model. If `recursive'
+-- is true, remove all the entities on their boundaries, down to
+-- dimension 0.
 gmshModelRemoveEntities :: [(Int, Int)] -> Maybe Bool -> IO()
 gmshModelRemoveEntities dimTags recursiveMaybe = do
    withArrayPairLen dimTags $ \dimTags_n' dimTags' -> do
@@ -787,6 +926,8 @@ foreign import ccall safe "gmshc.h gmshModelRemoveEntities"
       -> CBool
       -> Ptr CInt
       -> IO()
+
+-- Remove the entity name `name' from the current model.
 gmshModelRemoveEntityName :: String -> IO()
 gmshModelRemoveEntityName name = do
    withCString name $ \name' -> do
@@ -799,6 +940,9 @@ foreign import ccall safe "gmshc.h gmshModelRemoveEntityName"
       :: CString
       -> Ptr CInt
       -> IO()
+
+-- Remove the physical groups `dimTags' of the current model. If
+-- `dimTags' is empty, remove all groups.
 gmshModelRemovePhysicalGroups :: Maybe [(Int, Int)] -> IO()
 gmshModelRemovePhysicalGroups dimTagsMaybe = do
    let dimTags = fromMaybe ([]) dimTagsMaybe
@@ -813,6 +957,8 @@ foreign import ccall safe "gmshc.h gmshModelRemovePhysicalGroups"
       -> CSize
       -> Ptr CInt
       -> IO()
+
+-- Remove the physical name `name' from the current model.
 gmshModelRemovePhysicalName :: String -> IO()
 gmshModelRemovePhysicalName name = do
    withCString name $ \name' -> do
@@ -825,6 +971,8 @@ foreign import ccall safe "gmshc.h gmshModelRemovePhysicalName"
       :: CString
       -> Ptr CInt
       -> IO()
+
+-- Get the type of the entity of dimension `dim' and tag `tag'.
 gmshModelGetType :: Int -> Int -> IO(String)
 gmshModelGetType dim tag = do
    let dim' = fromIntegral dim
@@ -843,6 +991,11 @@ foreign import ccall safe "gmshc.h gmshModelGetType"
       -> Ptr CString
       -> Ptr CInt
       -> IO()
+
+-- In a partitioned model, get the parent of the entity of dimension
+-- `dim' and tag `tag', i.e. from which the entity is a part of, if
+-- any. `parentDim' and `parentTag' are set to -1 if the entity has no
+-- parent.
 gmshModelGetParent :: Int -> Int -> IO(Int, Int)
 gmshModelGetParent dim tag = do
    let dim' = fromIntegral dim
@@ -865,6 +1018,9 @@ foreign import ccall safe "gmshc.h gmshModelGetParent"
       -> Ptr CInt
       -> Ptr CInt
       -> IO()
+
+-- In a partitioned model, return the tags of the partition(s) to
+-- which the entity belongs.
 gmshModelGetPartitions :: Int -> Int -> IO([Int])
 gmshModelGetPartitions dim tag = do
    let dim' = fromIntegral dim
@@ -884,6 +1040,15 @@ foreign import ccall safe "gmshc.h gmshModelGetPartitions"
       -> Ptr CSize
       -> Ptr CInt
       -> IO()
+
+-- Evaluate the parametrization of the entity of dimension `dim' and
+-- tag `tag' at the parametric coordinates `parametricCoord'. Only
+-- valid for `dim' equal to 0 (with empty `parametricCoord'), 1 (with
+-- `parametricCoord' containing parametric coordinates on the curve)
+-- or 2 (with `parametricCoord' containing pairs of u, v parametric
+-- coordinates on the surface, concatenated: [p1u, p1v, p2u, ...]).
+-- Return triplets of x, y, z coordinates in `points', concatenated:
+-- [p1x, p1y, p1z, p2x, ...].
 gmshModelGetValue :: Int -> Int -> [Double] -> IO([Double])
 gmshModelGetValue dim tag parametricCoord = do
    let dim' = fromIntegral dim
@@ -906,6 +1071,18 @@ foreign import ccall safe "gmshc.h gmshModelGetValue"
       -> Ptr CSize
       -> Ptr CInt
       -> IO()
+
+-- Evaluate the derivative of the parametrization of the entity of
+-- dimension `dim' and tag `tag' at the parametric coordinates
+-- `parametricCoord'. Only valid for `dim' equal to 1 (with
+-- `parametricCoord' containing parametric coordinates on the curve)
+-- or 2 (with `parametricCoord' containing pairs of u, v parametric
+-- coordinates on the surface, concatenated: [p1u, p1v, p2u, ...]).
+-- For `dim' equal to 1 return the x, y, z components of the
+-- derivative with respect to u [d1ux, d1uy, d1uz, d2ux, ...]; for
+-- `dim' equal to 2 return the x, y, z components of the derivate with
+-- respect to u and v: [d1ux, d1uy, d1uz, d1vx, d1vy, d1vz, d2ux,
+-- ...].
 gmshModelGetDerivative :: Int -> Int -> [Double] -> IO([Double])
 gmshModelGetDerivative dim tag parametricCoord = do
    let dim' = fromIntegral dim
@@ -928,6 +1105,13 @@ foreign import ccall safe "gmshc.h gmshModelGetDerivative"
       -> Ptr CSize
       -> Ptr CInt
       -> IO()
+
+-- Evaluate the (maximum) curvature of the entity of dimension `dim'
+-- and tag `tag' at the parametric coordinates `parametricCoord'. Only
+-- valid for `dim' equal to 1 (with `parametricCoord' containing
+-- parametric coordinates on the curve) or 2 (with `parametricCoord'
+-- containing pairs of u, v parametric coordinates on the surface,
+-- concatenated: [p1u, p1v, p2u, ...]).
 gmshModelGetCurvature :: Int -> Int -> [Double] -> IO([Double])
 gmshModelGetCurvature dim tag parametricCoord = do
    let dim' = fromIntegral dim
@@ -950,6 +1134,11 @@ foreign import ccall safe "gmshc.h gmshModelGetCurvature"
       -> Ptr CSize
       -> Ptr CInt
       -> IO()
+
+-- Evaluate the principal curvatures of the surface with tag `tag' at
+-- the parametric coordinates `parametricCoord', as well as their
+-- respective directions. `parametricCoord' are given by pair of u and
+-- v coordinates, concatenated: [p1u, p1v, p2u, ...].
 gmshModelGetPrincipalCurvatures :: Int -> [Double] -> IO([Double], [Double], [Double], [Double])
 gmshModelGetPrincipalCurvatures tag parametricCoord = do
    let tag' = fromIntegral tag
@@ -985,6 +1174,12 @@ foreign import ccall safe "gmshc.h gmshModelGetPrincipalCurvatures"
       -> Ptr CSize
       -> Ptr CInt
       -> IO()
+
+-- Get the normal to the surface with tag `tag' at the parametric
+-- coordinates `parametricCoord'. `parametricCoord' are given by pairs
+-- of u and v coordinates, concatenated: [p1u, p1v, p2u, ...].
+-- `normals' are returned as triplets of x, y, z components,
+-- concatenated: [n1x, n1y, n1z, n2x, ...].
 gmshModelGetNormal :: Int -> [Double] -> IO([Double])
 gmshModelGetNormal tag parametricCoord = do
    let tag' = fromIntegral tag
@@ -1005,6 +1200,14 @@ foreign import ccall safe "gmshc.h gmshModelGetNormal"
       -> Ptr CSize
       -> Ptr CInt
       -> IO()
+
+-- Get the parametric coordinates `parametricCoord' for the points
+-- `points' on the entity of dimension `dim' and tag `tag'. `points'
+-- are given as triplets of x, y, z coordinates, concatenated: [p1x,
+-- p1y, p1z, p2x, ...]. `parametricCoord' returns the parametric
+-- coordinates t on the curve (if `dim' = 1) or pairs of u and v
+-- coordinates concatenated on the surface (if `dim' = 2), i.e. [p1t,
+-- p2t, ...] or [p1u, p1v, p2u, ...].
 gmshModelGetParametrization :: Int -> Int -> [Double] -> IO([Double])
 gmshModelGetParametrization dim tag points = do
    let dim' = fromIntegral dim
@@ -1027,6 +1230,9 @@ foreign import ccall safe "gmshc.h gmshModelGetParametrization"
       -> Ptr CSize
       -> Ptr CInt
       -> IO()
+
+-- Set the visibility of the model entities `dimTags' to `value'.
+-- Apply the visibility setting recursively if `recursive' is true.
 gmshModelSetVisibility :: [(Int, Int)] -> Int -> Maybe Bool -> IO()
 gmshModelSetVisibility dimTags value recursiveMaybe = do
    withArrayPairLen dimTags $ \dimTags_n' dimTags' -> do
@@ -1045,6 +1251,9 @@ foreign import ccall safe "gmshc.h gmshModelSetVisibility"
       -> CBool
       -> Ptr CInt
       -> IO()
+
+-- Get the visibility of the model entity of dimension `dim' and tag
+-- `tag'.
 gmshModelGetVisibility :: Int -> Int -> IO(Int)
 gmshModelGetVisibility dim tag = do
    let dim' = fromIntegral dim
@@ -1063,6 +1272,11 @@ foreign import ccall safe "gmshc.h gmshModelGetVisibility"
       -> Ptr CInt
       -> Ptr CInt
       -> IO()
+
+-- Set the color of the model entities `dimTags' to the RGBA value
+-- (`r', `g', `b', `a'), where `r', `g', `b' and `a' should be
+-- integers between 0 and 255. Apply the color setting recursively if
+-- `recursive' is true.
 gmshModelSetColor :: [(Int, Int)] -> Int -> Int -> Int -> Maybe Int -> Maybe Bool -> IO()
 gmshModelSetColor dimTags r g b aMaybe recursiveMaybe = do
    withArrayPairLen dimTags $ \dimTags_n' dimTags' -> do
@@ -1088,6 +1302,8 @@ foreign import ccall safe "gmshc.h gmshModelSetColor"
       -> CBool
       -> Ptr CInt
       -> IO()
+
+-- Get the color of the model entity of dimension `dim' and tag `tag'.
 gmshModelGetColor :: Int -> Int -> IO(Int, Int, Int, Int)
 gmshModelGetColor dim tag = do
    let dim' = fromIntegral dim
@@ -1118,6 +1334,8 @@ foreign import ccall safe "gmshc.h gmshModelGetColor"
       -> Ptr CInt
       -> Ptr CInt
       -> IO()
+
+-- Set the `x', `y', `z' coordinates of a geometrical point.
 gmshModelSetCoordinates :: Int -> Double -> Double -> Double -> IO()
 gmshModelSetCoordinates tag x y z = do
    let tag' = fromIntegral tag
@@ -1136,6 +1354,14 @@ foreign import ccall safe "gmshc.h gmshModelSetCoordinates"
       -> CDouble
       -> Ptr CInt
       -> IO()
+
+
+-----------------
+-- mesh functions
+-----------------
+
+-- Generate a mesh of the current model, up to dimension `dim' (0, 1,
+-- 2 or 3).
 gmshModelMeshGenerate :: Maybe Int -> IO()
 gmshModelMeshGenerate dimMaybe = do
    let dim = fromMaybe (3) dimMaybe
@@ -1149,6 +1375,8 @@ foreign import ccall safe "gmshc.h gmshModelMeshGenerate"
       :: CInt
       -> Ptr CInt
       -> IO()
+
+-- Partition the mesh of the current model into `numPart' partitions.
 gmshModelMeshPartition :: Int -> IO()
 gmshModelMeshPartition numPart = do
    let numPart' = fromIntegral numPart
@@ -1161,6 +1389,8 @@ foreign import ccall safe "gmshc.h gmshModelMeshPartition"
       :: CInt
       -> Ptr CInt
       -> IO()
+
+-- Unpartition the mesh of the current model.
 gmshModelMeshUnpartition :: IO()
 gmshModelMeshUnpartition = do
    alloca $ \errptr -> do
@@ -1171,6 +1401,16 @@ foreign import ccall safe "gmshc.h gmshModelMeshUnpartition"
    cgmshModelMeshUnpartition
       :: Ptr CInt
       -> IO()
+
+-- Optimize the mesh of the current model using `method' (empty for
+-- default tetrahedral mesh optimizer, "Netgen" for Netgen optimizer,
+-- "HighOrder" for direct high-order mesh optimizer,
+-- "HighOrderElastic" for high-order elastic smoother,
+-- "HighOrderFastCurving" for fast curving algorithm, "Laplace2D" for
+-- Laplace smoothing, "Relocate2D" and "Relocate3D" for node
+-- relocation). If `force' is set apply the optimization also to
+-- discrete entities. If `dimTags' is given, only apply the optimizer
+-- to the given entities.
 gmshModelMeshOptimize :: Maybe String -> Maybe Bool -> Maybe Int -> Maybe [(Int, Int)] -> IO()
 gmshModelMeshOptimize methodMaybe forceMaybe niterMaybe dimTagsMaybe = do
    let method = fromMaybe ("") methodMaybe
@@ -1194,6 +1434,8 @@ foreign import ccall safe "gmshc.h gmshModelMeshOptimize"
       -> CSize
       -> Ptr CInt
       -> IO()
+
+-- Recombine the mesh of the current model.
 gmshModelMeshRecombine :: IO()
 gmshModelMeshRecombine = do
    alloca $ \errptr -> do
@@ -1204,6 +1446,9 @@ foreign import ccall safe "gmshc.h gmshModelMeshRecombine"
    cgmshModelMeshRecombine
       :: Ptr CInt
       -> IO()
+
+-- Refine the mesh of the current model by uniformly splitting the
+-- elements.
 gmshModelMeshRefine :: IO()
 gmshModelMeshRefine = do
    alloca $ \errptr -> do
@@ -1214,6 +1459,9 @@ foreign import ccall safe "gmshc.h gmshModelMeshRefine"
    cgmshModelMeshRefine
       :: Ptr CInt
       -> IO()
+
+-- Set the order of the elements in the mesh of the current model to
+-- `order'.
 gmshModelMeshSetOrder :: Int -> IO()
 gmshModelMeshSetOrder order = do
    let order' = fromIntegral order
@@ -1226,6 +1474,9 @@ foreign import ccall safe "gmshc.h gmshModelMeshSetOrder"
       :: CInt
       -> Ptr CInt
       -> IO()
+
+-- Get the last entities (if any) where a meshing error occurred.
+-- Currently only populated by the new 3D meshing algorithms.
 gmshModelMeshGetLastEntityError :: IO([(Int,Int)])
 gmshModelMeshGetLastEntityError = do
    alloca $ \dimTags' -> do
@@ -1241,6 +1492,9 @@ foreign import ccall safe "gmshc.h gmshModelMeshGetLastEntityError"
       -> Ptr CSize
       -> Ptr CInt
       -> IO()
+
+-- Get the last nodes (if any) where a meshing error occurred.
+-- Currently only populated by the new 3D meshing algorithms.
 gmshModelMeshGetLastNodeError :: IO([Int])
 gmshModelMeshGetLastNodeError = do
    alloca $ \nodeTags' -> do
@@ -1256,6 +1510,8 @@ foreign import ccall safe "gmshc.h gmshModelMeshGetLastNodeError"
       -> Ptr CSize
       -> Ptr CInt
       -> IO()
+
+-- Clear the mesh, i.e. delete all the nodes and elements.
 gmshModelMeshClear :: IO()
 gmshModelMeshClear = do
    alloca $ \errptr -> do
@@ -1266,6 +1522,21 @@ foreign import ccall safe "gmshc.h gmshModelMeshClear"
    cgmshModelMeshClear
       :: Ptr CInt
       -> IO()
+
+-- Get the nodes classified on the entity of dimension `dim' and tag
+-- `tag'. If `tag' < 0, get the nodes for all entities of dimension
+-- `dim'. If `dim' and `tag' are negative, get all the nodes in the
+-- mesh. `nodeTags' contains the node tags (their unique, strictly
+-- positive identification numbers). `coord' is a vector of length 3
+-- times the length of `nodeTags' that contains the x, y, z
+-- coordinates of the nodes, concatenated: [n1x, n1y, n1z, n2x, ...].
+-- If `dim' >= 0 and `returnParamtricCoord' is set, `parametricCoord'
+-- contains the parametric coordinates ([u1, u2, ...] or [u1, v1, u2,
+-- ...]) of the nodes, if available. The length of `parametricCoord'
+-- can be 0 or `dim' times the length of `nodeTags'. If
+-- `includeBoundary' is set, also return the nodes classified on the
+-- boundary of the entity (which will be reparametrized on the entity
+-- if `dim' >= 0 in order to compute their parametric coordinates).
 gmshModelMeshGetNodes :: Maybe Int -> Maybe Int -> Maybe Bool -> Maybe Bool -> IO([Int], [Double], [Double])
 gmshModelMeshGetNodes dimMaybe tagMaybe includeBoundaryMaybe returnParametricCoordMaybe = do
    let dim = fromMaybe (-1) dimMaybe
@@ -1303,6 +1574,10 @@ foreign import ccall safe "gmshc.h gmshModelMeshGetNodes"
       -> CBool
       -> Ptr CInt
       -> IO()
+
+-- Get the nodes classified on the entity of tag `tag', for all the
+-- elements of type `elementType'. The other arguments are treated as
+-- in `getNodes'.
 gmshModelMeshGetNodesByElementType :: Int -> Maybe Int -> Maybe Bool -> IO([Int], [Double], [Double])
 gmshModelMeshGetNodesByElementType elementType tagMaybe returnParametricCoordMaybe = do
    let elementType' = fromIntegral elementType
@@ -1336,6 +1611,11 @@ foreign import ccall safe "gmshc.h gmshModelMeshGetNodesByElementType"
       -> CBool
       -> Ptr CInt
       -> IO()
+
+-- Get the coordinates and the parametric coordinates (if any) of the
+-- node with tag `tag'. This function relies on an internal cache (a
+-- vector in case of dense node numbering, a map otherwise); for large
+-- meshes accessing nodes in bulk is often preferable.
 gmshModelMeshGetNode :: Int -> IO([Double], [Double])
 gmshModelMeshGetNode nodeTag = do
    let nodeTag' = fromIntegral nodeTag
@@ -1358,6 +1638,11 @@ foreign import ccall safe "gmshc.h gmshModelMeshGetNode"
       -> Ptr CSize
       -> Ptr CInt
       -> IO()
+
+-- Set the coordinates and the parametric coordinates (if any) of the
+-- node with tag `tag'. This function relies on an internal cache (a
+-- vector in case of dense node numbering, a map otherwise); for large
+-- meshes accessing nodes in bulk is often preferable.
 gmshModelMeshSetNode :: Int -> [Double] -> [Double] -> IO()
 gmshModelMeshSetNode nodeTag coord parametricCoord = do
    let nodeTag' = fromIntegral nodeTag
@@ -1376,6 +1661,8 @@ foreign import ccall safe "gmshc.h gmshModelMeshSetNode"
       -> CSize
       -> Ptr CInt
       -> IO()
+
+-- Rebuild the node cache.
 gmshModelMeshRebuildNodeCache :: Maybe Bool -> IO()
 gmshModelMeshRebuildNodeCache onlyIfNecessaryMaybe = do
    let onlyIfNecessary = fromMaybe (True) onlyIfNecessaryMaybe
@@ -1389,6 +1676,12 @@ foreign import ccall safe "gmshc.h gmshModelMeshRebuildNodeCache"
       :: CBool
       -> Ptr CInt
       -> IO()
+
+-- Get the nodes from all the elements belonging to the physical group
+-- of dimension `dim' and tag `tag'. `nodeTags' contains the node
+-- tags; `coord' is a vector of length 3 times the length of
+-- `nodeTags' that contains the x, y, z coordinates of the nodes,
+-- concatenated: [n1x, n1y, n1z, n2x, ...].
 gmshModelMeshGetNodesForPhysicalGroup :: Int -> Int -> IO([Int], [Double])
 gmshModelMeshGetNodesForPhysicalGroup dim tag = do
    let dim' = fromIntegral dim
@@ -1413,6 +1706,16 @@ foreign import ccall safe "gmshc.h gmshModelMeshGetNodesForPhysicalGroup"
       -> Ptr CSize
       -> Ptr CInt
       -> IO()
+
+-- Add nodes classified on the model entity of dimension `dim' and tag
+-- `tag'. `nodeTags' contains the node tags (their unique, strictly
+-- positive identification numbers). `coord' is a vector of length 3
+-- times the length of `nodeTags' that contains the x, y, z
+-- coordinates of the nodes, concatenated: [n1x, n1y, n1z, n2x, ...].
+-- The optional `parametricCoord' vector contains the parametric
+-- coordinates of the nodes, if any. The length of `parametricCoord'
+-- can be 0 or `dim' times the length of `nodeTags'. If the `nodeTags'
+-- vector is empty, new tags are automatically assigned to the nodes.
 gmshModelMeshAddNodes :: Int -> Int -> [Int] -> [Double] -> Maybe [Double] -> IO()
 gmshModelMeshAddNodes dim tag nodeTags coord parametricCoordMaybe = do
    let dim' = fromIntegral dim
@@ -1437,6 +1740,12 @@ foreign import ccall safe "gmshc.h gmshModelMeshAddNodes"
       -> CSize
       -> Ptr CInt
       -> IO()
+
+-- Reclassify all nodes on their associated model entity, based on the
+-- elements. Can be used when importing nodes in bulk (e.g. by
+-- associating them all to a single volume), to reclassify them
+-- correctly on model surfaces, curves, etc. after the elements have
+-- been set.
 gmshModelMeshReclassifyNodes :: IO()
 gmshModelMeshReclassifyNodes = do
    alloca $ \errptr -> do
@@ -1447,6 +1756,11 @@ foreign import ccall safe "gmshc.h gmshModelMeshReclassifyNodes"
    cgmshModelMeshReclassifyNodes
       :: Ptr CInt
       -> IO()
+
+-- Relocate the nodes classified on the entity of dimension `dim' and
+-- tag `tag' using their parametric coordinates. If `tag' < 0,
+-- relocate the nodes for all entities of dimension `dim'. If `dim'
+-- and `tag' are negative, relocate all the nodes in the mesh.
 gmshModelMeshRelocateNodes :: Maybe Int -> Maybe Int -> IO()
 gmshModelMeshRelocateNodes dimMaybe tagMaybe = do
    let dim = fromMaybe (-1) dimMaybe
@@ -1463,6 +1777,21 @@ foreign import ccall safe "gmshc.h gmshModelMeshRelocateNodes"
       -> CInt
       -> Ptr CInt
       -> IO()
+
+-- Get the elements classified on the entity of dimension `dim' and
+-- tag `tag'. If `tag' < 0, get the elements for all entities of
+-- dimension `dim'. If `dim' and `tag' are negative, get all the
+-- elements in the mesh. `elementTypes' contains the MSH types of the
+-- elements (e.g. `2' for 3-node triangles: see `getElementProperties'
+-- to obtain the properties for a given element type). `elementTags'
+-- is a vector of the same length as `elementTypes'; each entry is a
+-- vector containing the tags (unique, strictly positive identifiers)
+-- of the elements of the corresponding type. `nodeTags' is also a
+-- vector of the same length as `elementTypes'; each entry is a vector
+-- of length equal to the number of elements of the given type times
+-- the number N of nodes for this type of element, that contains the
+-- node tags of all the elements of the given type, concatenated:
+-- [e1n1, e1n2, ..., e1nN, e2n1, ...].
 gmshModelMeshGetElements :: Maybe Int -> Maybe Int -> IO([Int], [[Int]], [[Int]])
 gmshModelMeshGetElements dimMaybe tagMaybe = do
    let dim = fromMaybe (-1) dimMaybe
@@ -1498,6 +1827,11 @@ foreign import ccall safe "gmshc.h gmshModelMeshGetElements"
       -> CInt
       -> Ptr CInt
       -> IO()
+
+-- Get the type and node tags of the element with tag `tag'. This
+-- function relies on an internal cache (a vector in case of dense
+-- element numbering, a map otherwise); for large meshes accessing
+-- elements in bulk is often preferable.
 gmshModelMeshGetElement :: Int -> IO(Int, [Int])
 gmshModelMeshGetElement elementTag = do
    let elementTag' = fromIntegral elementTag
@@ -1519,6 +1853,14 @@ foreign import ccall safe "gmshc.h gmshModelMeshGetElement"
       -> Ptr CSize
       -> Ptr CInt
       -> IO()
+
+-- Search the mesh for an element located at coordinates (`x', `y',
+-- `z'). This function performs a search in a spatial octree. If an
+-- element is found, return its tag, type and node tags, as well as
+-- the local coordinates (`u', `v', `w') within the element
+-- corresponding to search location. If `dim' is >= 0, only search for
+-- elements of the given dimension. If `strict' is not set, use a
+-- tolerance to find elements near the search location.
 gmshModelMeshGetElementByCoordinates :: Double -> Double -> Double -> Maybe Int -> Maybe Bool -> IO(Int, Int, [Int], Double, Double, Double)
 gmshModelMeshGetElementByCoordinates x y z dimMaybe strictMaybe = do
    let x' = realToFrac x
@@ -1566,6 +1908,14 @@ foreign import ccall safe "gmshc.h gmshModelMeshGetElementByCoordinates"
       -> CBool
       -> Ptr CInt
       -> IO()
+
+-- Search the mesh for element(s) located at coordinates (`x', `y',
+-- `z'). This function performs a search in a spatial octree. Return
+-- the tags of all found elements in `elementTags'. Additional
+-- information about the elements can be accessed through `getElement'
+-- and `getLocalCoordinatesInElement'. If `dim' is >= 0, only search
+-- for elements of the given dimension. If `strict' is not set, use a
+-- tolerance to find elements near the search location.
 gmshModelMeshGetElementsByCoordinates :: Double -> Double -> Double -> Maybe Int -> Maybe Bool -> IO([Int])
 gmshModelMeshGetElementsByCoordinates x y z dimMaybe strictMaybe = do
    let x' = realToFrac x
@@ -1593,6 +1943,12 @@ foreign import ccall safe "gmshc.h gmshModelMeshGetElementsByCoordinates"
       -> CBool
       -> Ptr CInt
       -> IO()
+
+-- Return the local coordinates (`u', `v', `w') within the element
+-- `elementTag' corresponding to the model coordinates (`x', `y',
+-- `z'). This function relies on an internal cache (a vector in case
+-- of dense element numbering, a map otherwise); for large meshes
+-- accessing elements in bulk is often preferable.
 gmshModelMeshGetLocalCoordinatesInElement :: Int -> Double -> Double -> Double -> IO(Double, Double, Double)
 gmshModelMeshGetLocalCoordinatesInElement elementTag x y z = do
    let elementTag' = fromIntegral elementTag
@@ -1623,6 +1979,11 @@ foreign import ccall safe "gmshc.h gmshModelMeshGetLocalCoordinatesInElement"
       -> Ptr CDouble
       -> Ptr CInt
       -> IO()
+
+-- Get the types of elements in the entity of dimension `dim' and tag
+-- `tag'. If `tag' < 0, get the types for all entities of dimension
+-- `dim'. If `dim' and `tag' are negative, get all the types in the
+-- mesh.
 gmshModelMeshGetElementTypes :: Maybe Int -> Maybe Int -> IO([Int])
 gmshModelMeshGetElementTypes dimMaybe tagMaybe = do
    let dim = fromMaybe (-1) dimMaybe
@@ -1644,6 +2005,12 @@ foreign import ccall safe "gmshc.h gmshModelMeshGetElementTypes"
       -> CInt
       -> Ptr CInt
       -> IO()
+
+-- Return an element type given its family name `familyName' ("point",
+-- "line", "triangle", "quadrangle", "tetrahedron", "pyramid",
+-- "prism", "hexahedron") and polynomial order `order'. If `serendip'
+-- is true, return the corresponding serendip element type (element
+-- without interior nodes).
 gmshModelMeshGetElementType :: String -> Int -> Maybe Bool -> IO(Int)
 gmshModelMeshGetElementType familyName order serendipMaybe = do
    withCString familyName $ \familyName' -> do
@@ -1662,6 +2029,12 @@ foreign import ccall safe "gmshc.h gmshModelMeshGetElementType"
       -> CBool
       -> Ptr CInt
       -> IO(CInt)
+
+-- Get the properties of an element of type `elementType': its name
+-- (`elementName'), dimension (`dim'), order (`order'), number of
+-- nodes (`numNodes'), coordinates of the nodes in the reference
+-- element (`nodeCoord' vector, of length `dim' times `numNodes') and
+-- number of primary (first order) nodes (`numPrimaryNodes').
 gmshModelMeshGetElementProperties :: Int -> IO(String, Int, Int, Int, [Double], Int)
 gmshModelMeshGetElementProperties elementType = do
    let elementType' = fromIntegral elementType
@@ -1699,6 +2072,17 @@ foreign import ccall safe "gmshc.h gmshModelMeshGetElementProperties"
       -> Ptr CInt
       -> Ptr CInt
       -> IO()
+
+-- Get the elements of type `elementType' classified on the entity of
+-- tag `tag'. If `tag' < 0, get the elements for all entities.
+-- `elementTags' is a vector containing the tags (unique, strictly
+-- positive identifiers) of the elements of the corresponding type.
+-- `nodeTags' is a vector of length equal to the number of elements of
+-- the given type times the number N of nodes for this type of
+-- element, that contains the node tags of all the elements of the
+-- given type, concatenated: [e1n1, e1n2, ..., e1nN, e2n1, ...]. If
+-- `numTasks' > 1, only compute and return the part of the data
+-- indexed by `task'.
 gmshModelMeshGetElementsByType :: Int -> Maybe Int -> Maybe Int -> Maybe Int -> IO([Int], [Int])
 gmshModelMeshGetElementsByType elementType tagMaybe taskMaybe numTasksMaybe = do
    let elementType' = fromIntegral elementType
@@ -1730,6 +2114,18 @@ foreign import ccall safe "gmshc.h gmshModelMeshGetElementsByType"
       -> CSize
       -> Ptr CInt
       -> IO()
+
+-- Add elements classified on the entity of dimension `dim' and tag
+-- `tag'. `types' contains the MSH types of the elements (e.g. `2' for
+-- 3-node triangles: see the Gmsh reference manual). `elementTags' is
+-- a vector of the same length as `types'; each entry is a vector
+-- containing the tags (unique, strictly positive identifiers) of the
+-- elements of the corresponding type. `nodeTags' is also a vector of
+-- the same length as `types'; each entry is a vector of length equal
+-- to the number of elements of the given type times the number N of
+-- nodes per element, that contains the node tags of all the elements
+-- of the given type, concatenated: [e1n1, e1n2, ..., e1nN, e2n1,
+-- ...].
 gmshModelMeshAddElements :: Int -> Int -> [Int] -> [[Int]] -> [[Int]] -> IO()
 gmshModelMeshAddElements dim tag elementTypes elementTags nodeTags = do
    let dim' = fromIntegral dim
@@ -1755,6 +2151,15 @@ foreign import ccall safe "gmshc.h gmshModelMeshAddElements"
       -> CSize
       -> Ptr CInt
       -> IO()
+
+-- Add elements of type `elementType' classified on the entity of tag
+-- `tag'. `elementTags' contains the tags (unique, strictly positive
+-- identifiers) of the elements of the corresponding type. `nodeTags'
+-- is a vector of length equal to the number of elements times the
+-- number N of nodes per element, that contains the node tags of all
+-- the elements, concatenated: [e1n1, e1n2, ..., e1nN, e2n1, ...]. If
+-- the `elementTag' vector is empty, new tags are automatically
+-- assigned to the elements.
 gmshModelMeshAddElementsByType :: Int -> Int -> [Int] -> [Int] -> IO()
 gmshModelMeshAddElementsByType tag elementType elementTags nodeTags = do
    let tag' = fromIntegral tag
@@ -1775,6 +2180,14 @@ foreign import ccall safe "gmshc.h gmshModelMeshAddElementsByType"
       -> CSize
       -> Ptr CInt
       -> IO()
+
+-- Get the numerical quadrature information for the given element type
+-- `elementType' and integration rule `integrationType' (e.g. "Gauss4"
+-- for a Gauss quadrature suited for integrating 4th order
+-- polynomials). `integrationPoints' contains the u, v, w coordinates
+-- of the G integration points in the reference element: [g1u, g1v,
+-- g1w, ..., gGu, gGv, gGw]. `integrationWeigths' contains the
+-- associated weights: [g1q, ..., gGq].
 gmshModelMeshGetIntegrationPoints :: Int -> String -> IO([Double], [Double])
 gmshModelMeshGetIntegrationPoints elementType integrationType = do
    let elementType' = fromIntegral elementType
@@ -1799,6 +2212,23 @@ foreign import ccall safe "gmshc.h gmshModelMeshGetIntegrationPoints"
       -> Ptr CSize
       -> Ptr CInt
       -> IO()
+
+-- Get the Jacobians of all the elements of type `elementType'
+-- classified on the entity of tag `tag', at the G integration points
+-- `integrationPoints' given as concatenated triplets of coordinates
+-- in the reference element [g1u, g1v, g1w, ..., gGu, gGv, gGw]. Data
+-- is returned by element, with elements in the same order as in
+-- `getElements' and `getElementsByType'. `jacobians' contains for
+-- each element the 9 entries of the 3x3 Jacobian matrix at each
+-- integration point. The matrix is returned by column: [e1g1Jxu,
+-- e1g1Jyu, e1g1Jzu, e1g1Jxv, ..., e1g1Jzw, e1g2Jxu, ..., e1gGJzw,
+-- e2g1Jxu, ...], with Jxu=dx/du, Jyu=dy/du, etc. `determinants'
+-- contains for each element the determinant of the Jacobian matrix at
+-- each integration point: [e1g1, e1g2, ... e1gG, e2g1, ...]. `points'
+-- contains for each element the x, y, z coordinates of the
+-- integration points. If `tag' < 0, get the Jacobian data for all
+-- entities. If `numTasks' > 1, only compute and return the part of
+-- the data indexed by `task'.
 gmshModelMeshGetJacobians :: Int -> [Double] -> Maybe Int -> Maybe Int -> Maybe Int -> IO([Double], [Double], [Double])
 gmshModelMeshGetJacobians elementType integrationPoints tagMaybe taskMaybe numTasksMaybe = do
    let elementType' = fromIntegral elementType
@@ -1838,6 +2268,18 @@ foreign import ccall safe "gmshc.h gmshModelMeshGetJacobians"
       -> CSize
       -> Ptr CInt
       -> IO()
+
+-- Get the basis functions of the element of type `elementType' at the
+-- integration points `integrationPoints' (given as concatenated
+-- triplets of coordinates in the reference element [g1u, g1v, g1w,
+-- ..., gGu, gGv, gGw]), for the function space `functionSpaceType'
+-- (e.g. "Lagrange" or "GradLagrange" for Lagrange basis functions or
+-- their gradient, in the u, v, w coordinates of the reference
+-- element). `numComponents' returns the number C of components of a
+-- basis function. `basisFunctions' returns the value of the N basis
+-- functions at the integration points, i.e. [g1f1, g1f2, ..., g1fN,
+-- g2f1, ...] when C == 1 or [g1f1u, g1f1v, g1f1w, g1f2u, ..., g1fNw,
+-- g2f1u, ...] when C == 3.
 gmshModelMeshGetBasisFunctions :: Int -> [Double] -> String -> IO(Int, [Double])
 gmshModelMeshGetBasisFunctions elementType integrationPoints functionSpaceType = do
    let elementType' = fromIntegral elementType
@@ -1864,6 +2306,10 @@ foreign import ccall safe "gmshc.h gmshModelMeshGetBasisFunctions"
       -> Ptr CSize
       -> Ptr CInt
       -> IO()
+
+-- Get the global edge identifier `edgeNum' for an input list of node
+-- pairs, concatenated in the vector `edgeNodes'.  Warning: this is an
+-- experimental feature and will probably change in a future release.
 gmshModelMeshGetEdgeNumber :: [Int] -> IO([Int])
 gmshModelMeshGetEdgeNumber edgeNodes = do
    withArrayIntLen edgeNodes $ \edgeNodes_n' edgeNodes' -> do
@@ -1882,6 +2328,10 @@ foreign import ccall safe "gmshc.h gmshModelMeshGetEdgeNumber"
       -> Ptr CSize
       -> Ptr CInt
       -> IO()
+
+-- Get the local multipliers (to guarantee H(curl)-conformity) of the
+-- order 0 H(curl) basis functions. Warning: this is an experimental
+-- feature and will probably change in a future release.
 gmshModelMeshGetLocalMultipliersForHcurl0 :: Int -> Maybe Int -> IO([Int])
 gmshModelMeshGetLocalMultipliersForHcurl0 elementType tagMaybe = do
    let elementType' = fromIntegral elementType
@@ -1902,6 +2352,23 @@ foreign import ccall safe "gmshc.h gmshModelMeshGetLocalMultipliersForHcurl0"
       -> CInt
       -> Ptr CInt
       -> IO()
+
+-- Get the element-dependent basis functions of the elements of type
+-- `elementType' in the entity of tag `tag'at the integration points
+-- `integrationPoints' (given as concatenated triplets of coordinates
+-- in the reference element [g1u, g1v, g1w, ..., gGu, gGv, gGw]), for
+-- the function space `functionSpaceType' (e.g. "H1Legendre3" or
+-- "GradH1Legendre3" for 3rd order hierarchical H1 Legendre functions
+-- or their gradient, in the u, v, w coordinates of the reference
+-- elements). `numComponents' returns the number C of components of a
+-- basis function. `numBasisFunctions' returns the number N of basis
+-- functions per element. `basisFunctions' returns the value of the
+-- basis functions at the integration points for each element:
+-- [e1g1f1,..., e1g1fN, e1g2f1,..., e2g1f1, ...] when C == 1 or
+-- [e1g1f1u, e1g1f1v,..., e1g1fNw, e1g2f1u,..., e2g1f1u, ...].
+-- Warning: this is an experimental feature and will probably change
+-- in a future release. If `numTasks' > 1, only compute and return the
+-- part of the data indexed by `task'.
 gmshModelMeshGetBasisFunctionsForElements :: Int -> [Double] -> String -> Maybe Int -> Maybe Int -> Maybe Int -> IO(Int, Int, [Double])
 gmshModelMeshGetBasisFunctionsForElements elementType integrationPoints functionSpaceType tagMaybe taskMaybe numTasksMaybe = do
    let elementType' = fromIntegral elementType
@@ -1941,6 +2408,14 @@ foreign import ccall safe "gmshc.h gmshModelMeshGetBasisFunctionsForElements"
       -> CSize
       -> Ptr CInt
       -> IO()
+
+-- Generate the `keys' for the elements of type `elementType' in the
+-- entity of tag `tag', for the `functionSpaceType' function space.
+-- Each key uniquely identifies a basis function in the function
+-- space. If `returnCoord' is set, the `coord' vector contains the x,
+-- y, z coordinates locating basis functions for sorting purposes.
+-- Warning: this is an experimental feature and will probably change
+-- in a future release.
 gmshModelMeshGetKeysForElements :: Int -> String -> Maybe Int -> Maybe Bool -> IO([(Int,Int)], [Double])
 gmshModelMeshGetKeysForElements elementType functionSpaceType tagMaybe returnCoordMaybe = do
    let elementType' = fromIntegral elementType
@@ -1971,6 +2446,9 @@ foreign import ccall safe "gmshc.h gmshModelMeshGetKeysForElements"
       -> CBool
       -> Ptr CInt
       -> IO()
+
+-- Get the number of keys by elements of type `elementType' for
+-- function space named `functionSpaceType'.
 gmshModelMeshGetNumberOfKeysForElements :: Int -> String -> IO(Int)
 gmshModelMeshGetNumberOfKeysForElements elementType functionSpaceType = do
    let elementType' = fromIntegral elementType
@@ -1986,6 +2464,14 @@ foreign import ccall safe "gmshc.h gmshModelMeshGetNumberOfKeysForElements"
       -> CString
       -> Ptr CInt
       -> IO(CInt)
+
+-- Get information about the `keys'. `infoKeys' returns information
+-- about the functions associated with the `keys'. `infoKeys[0].first'
+-- describes the type of function (0 for  vertex function, 1 for edge
+-- function, 2 for face function and 3 for bubble function).
+-- `infoKeys[0].second' gives the order of the function associated
+-- with the key. Warning: this is an experimental feature and will
+-- probably change in a future release.
 gmshModelMeshGetInformationForElements :: [(Int, Int)] -> Int -> String -> IO([(Int,Int)])
 gmshModelMeshGetInformationForElements keys elementType functionSpaceType = do
    withArrayPairLen keys $ \keys_n' keys' -> do
@@ -2008,6 +2494,8 @@ foreign import ccall safe "gmshc.h gmshModelMeshGetInformationForElements"
       -> Ptr CSize
       -> Ptr CInt
       -> IO()
+
+-- Precomputes the basis functions corresponding to `elementType'.
 gmshModelMeshPrecomputeBasisFunctions :: Int -> IO()
 gmshModelMeshPrecomputeBasisFunctions elementType = do
    let elementType' = fromIntegral elementType
@@ -2020,6 +2508,15 @@ foreign import ccall safe "gmshc.h gmshModelMeshPrecomputeBasisFunctions"
       :: CInt
       -> Ptr CInt
       -> IO()
+
+-- Get the barycenters of all elements of type `elementType'
+-- classified on the entity of tag `tag'. If `primary' is set, only
+-- the primary nodes of the elements are taken into account for the
+-- barycenter calculation. If `fast' is set, the function returns the
+-- sum of the primary node coordinates (without normalizing by the
+-- number of nodes). If `tag' < 0, get the barycenters for all
+-- entities. If `numTasks' > 1, only compute and return the part of
+-- the data indexed by `task'.
 gmshModelMeshGetBarycenters :: Int -> Int -> Bool -> Bool -> Maybe Int -> Maybe Int -> IO([Double])
 gmshModelMeshGetBarycenters elementType tag fast primary taskMaybe numTasksMaybe = do
    let elementType' = fromIntegral elementType
@@ -2049,6 +2546,15 @@ foreign import ccall safe "gmshc.h gmshModelMeshGetBarycenters"
       -> CSize
       -> Ptr CInt
       -> IO()
+
+-- Get the nodes on the edges of all elements of type `elementType'
+-- classified on the entity of tag `tag'. `nodeTags' contains the node
+-- tags of the edges for all the elements: [e1a1n1, e1a1n2, e1a2n1,
+-- ...]. Data is returned by element, with elements in the same order
+-- as in `getElements' and `getElementsByType'. If `primary' is set,
+-- only the primary (begin/end) nodes of the edges are returned. If
+-- `tag' < 0, get the edge nodes for all entities. If `numTasks' > 1,
+-- only compute and return the part of the data indexed by `task'.
 gmshModelMeshGetElementEdgeNodes :: Int -> Maybe Int -> Maybe Bool -> Maybe Int -> Maybe Int -> IO([Int])
 gmshModelMeshGetElementEdgeNodes elementType tagMaybe primaryMaybe taskMaybe numTasksMaybe = do
    let elementType' = fromIntegral elementType
@@ -2078,6 +2584,17 @@ foreign import ccall safe "gmshc.h gmshModelMeshGetElementEdgeNodes"
       -> CSize
       -> Ptr CInt
       -> IO()
+
+-- Get the nodes on the faces of type `faceType' (3 for triangular
+-- faces, 4 for quadrangular faces) of all elements of type
+-- `elementType' classified on the entity of tag `tag'. `nodeTags'
+-- contains the node tags of the faces for all elements: [e1f1n1, ...,
+-- e1f1nFaceType, e1f2n1, ...]. Data is returned by element, with
+-- elements in the same order as in `getElements' and
+-- `getElementsByType'. If `primary' is set, only the primary (corner)
+-- nodes of the faces are returned. If `tag' < 0, get the face nodes
+-- for all entities. If `numTasks' > 1, only compute and return the
+-- part of the data indexed by `task'.
 gmshModelMeshGetElementFaceNodes :: Int -> Int -> Maybe Int -> Maybe Bool -> Maybe Int -> Maybe Int -> IO([Int])
 gmshModelMeshGetElementFaceNodes elementType faceType tagMaybe primaryMaybe taskMaybe numTasksMaybe = do
    let elementType' = fromIntegral elementType
@@ -2109,6 +2626,10 @@ foreign import ccall safe "gmshc.h gmshModelMeshGetElementFaceNodes"
       -> CSize
       -> Ptr CInt
       -> IO()
+
+-- Get the ghost elements `elementTags' and their associated
+-- `partitions' stored in the ghost entity of dimension `dim' and tag
+-- `tag'.
 gmshModelMeshGetGhostElements :: Int -> Int -> IO([Int], [Int])
 gmshModelMeshGetGhostElements dim tag = do
    let dim' = fromIntegral dim
@@ -2133,6 +2654,9 @@ foreign import ccall safe "gmshc.h gmshModelMeshGetGhostElements"
       -> Ptr CSize
       -> Ptr CInt
       -> IO()
+
+-- Set a mesh size constraint on the model entities `dimTags'.
+-- Currently only entities of dimension 0 (points) are handled.
 gmshModelMeshSetSize :: [(Int, Int)] -> Double -> IO()
 gmshModelMeshSetSize dimTags size = do
    withArrayPairLen dimTags $ \dimTags_n' dimTags' -> do
@@ -2148,6 +2672,12 @@ foreign import ccall safe "gmshc.h gmshModelMeshSetSize"
       -> CDouble
       -> Ptr CInt
       -> IO()
+
+-- Set a transfinite meshing constraint on the curve `tag', with
+-- `numNodes' nodes distributed according to `meshType' and `coef'.
+-- Currently supported types are "Progression" (geometrical
+-- progression with power `coef') and "Bump" (refinement toward both
+-- extremities of the curve).
 gmshModelMeshSetTransfiniteCurve :: Int -> Int -> Maybe String -> Maybe Double -> IO()
 gmshModelMeshSetTransfiniteCurve tag numNodes meshTypeMaybe coefMaybe = do
    let tag' = fromIntegral tag
@@ -2168,6 +2698,15 @@ foreign import ccall safe "gmshc.h gmshModelMeshSetTransfiniteCurve"
       -> CDouble
       -> Ptr CInt
       -> IO()
+
+-- Set a transfinite meshing constraint on the surface `tag'.
+-- `arrangement' describes the arrangement of the triangles when the
+-- surface is not flagged as recombined: currently supported values
+-- are "Left", "Right", "AlternateLeft" and "AlternateRight".
+-- `cornerTags' can be used to specify the (3 or 4) corners of the
+-- transfinite interpolation explicitly; specifying the corners
+-- explicitly is mandatory if the surface has more that 3 or 4 points
+-- on its boundary.
 gmshModelMeshSetTransfiniteSurface :: Int -> Maybe String -> Maybe [Int] -> IO()
 gmshModelMeshSetTransfiniteSurface tag arrangementMaybe cornerTagsMaybe = do
    let tag' = fromIntegral tag
@@ -2187,6 +2726,10 @@ foreign import ccall safe "gmshc.h gmshModelMeshSetTransfiniteSurface"
       -> CSize
       -> Ptr CInt
       -> IO()
+
+-- Set a transfinite meshing constraint on the surface `tag'.
+-- `cornerTags' can be used to specify the (6 or 8) corners of the
+-- transfinite interpolation explicitly.
 gmshModelMeshSetTransfiniteVolume :: Int -> Maybe [Int] -> IO()
 gmshModelMeshSetTransfiniteVolume tag cornerTagsMaybe = do
    let tag' = fromIntegral tag
@@ -2203,6 +2746,10 @@ foreign import ccall safe "gmshc.h gmshModelMeshSetTransfiniteVolume"
       -> CSize
       -> Ptr CInt
       -> IO()
+
+-- Set a recombination meshing constraint on the model entity of
+-- dimension `dim' and tag `tag'. Currently only entities of dimension
+-- 2 (to recombine triangles into quadrangles) are supported.
 gmshModelMeshSetRecombine :: Int -> Int -> IO()
 gmshModelMeshSetRecombine dim tag = do
    let dim' = fromIntegral dim
@@ -2217,6 +2764,10 @@ foreign import ccall safe "gmshc.h gmshModelMeshSetRecombine"
       -> CInt
       -> Ptr CInt
       -> IO()
+
+-- Set a smoothing meshing constraint on the model entity of dimension
+-- `dim' and tag `tag'. `val' iterations of a Laplace smoother are
+-- applied.
 gmshModelMeshSetSmoothing :: Int -> Int -> Int -> IO()
 gmshModelMeshSetSmoothing dim tag val = do
    let dim' = fromIntegral dim
@@ -2233,6 +2784,12 @@ foreign import ccall safe "gmshc.h gmshModelMeshSetSmoothing"
       -> CInt
       -> Ptr CInt
       -> IO()
+
+-- Set a reverse meshing constraint on the model entity of dimension
+-- `dim' and tag `tag'. If `val' is true, the mesh orientation will be
+-- reversed with respect to the natural mesh orientation (i.e. the
+-- orientation consistent with the orientation of the geometry). If
+-- `val' is false, the mesh is left as-is.
 gmshModelMeshSetReverse :: Int -> Int -> Maybe Bool -> IO()
 gmshModelMeshSetReverse dim tag valMaybe = do
    let dim' = fromIntegral dim
@@ -2250,6 +2807,9 @@ foreign import ccall safe "gmshc.h gmshModelMeshSetReverse"
       -> CBool
       -> Ptr CInt
       -> IO()
+
+-- Set the meshing algorithm on the model entity of dimension `dim'
+-- and tag `tag'. Currently only supported for `dim' == 2.
 gmshModelMeshSetAlgorithm :: Int -> Int -> Int -> IO()
 gmshModelMeshSetAlgorithm dim tag val = do
    let dim' = fromIntegral dim
@@ -2266,6 +2826,10 @@ foreign import ccall safe "gmshc.h gmshModelMeshSetAlgorithm"
       -> CInt
       -> Ptr CInt
       -> IO()
+
+-- Force the mesh size to be extended from the boundary, or not, for
+-- the model entity of dimension `dim' and tag `tag'. Currently only
+-- supported for `dim' == 2.
 gmshModelMeshSetSizeFromBoundary :: Int -> Int -> Int -> IO()
 gmshModelMeshSetSizeFromBoundary dim tag val = do
    let dim' = fromIntegral dim
@@ -2282,6 +2846,11 @@ foreign import ccall safe "gmshc.h gmshModelMeshSetSizeFromBoundary"
       -> CInt
       -> Ptr CInt
       -> IO()
+
+-- Set a compound meshing constraint on the model entities of
+-- dimension `dim' and tags `tags'. During meshing, compound entities
+-- are treated as a single discrete entity, which is automatically
+-- reparametrized.
 gmshModelMeshSetCompound :: Int -> [Int] -> IO()
 gmshModelMeshSetCompound dim tags = do
    let dim' = fromIntegral dim
@@ -2297,6 +2866,11 @@ foreign import ccall safe "gmshc.h gmshModelMeshSetCompound"
       -> CSize
       -> Ptr CInt
       -> IO()
+
+-- Set meshing constraints on the bounding surfaces of the volume of
+-- tag `tag' so that all surfaces are oriented with outward pointing
+-- normals. Currently only available with the OpenCASCADE kernel, as
+-- it relies on the STL triangulation.
 gmshModelMeshSetOutwardOrientation :: Int -> IO()
 gmshModelMeshSetOutwardOrientation tag = do
    let tag' = fromIntegral tag
@@ -2309,6 +2883,13 @@ foreign import ccall safe "gmshc.h gmshModelMeshSetOutwardOrientation"
       :: CInt
       -> Ptr CInt
       -> IO()
+
+-- Embed the model entities of dimension `dim' and tags `tags' in the
+-- (`inDim', `inTag') model entity. The dimension `dim' can 0, 1 or 2
+-- and must be strictly smaller than `inDim', which must be either 2
+-- or 3. The embedded entities should not be part of the boundary of
+-- the entity `inTag', whose mesh will conform to the mesh of the
+-- embedded entities.
 gmshModelMeshEmbed :: Int -> [Int] -> Int -> Int -> IO()
 gmshModelMeshEmbed dim tags inDim inTag = do
    let dim' = fromIntegral dim
@@ -2328,6 +2909,10 @@ foreign import ccall safe "gmshc.h gmshModelMeshEmbed"
       -> CInt
       -> Ptr CInt
       -> IO()
+
+-- Remove embedded entities from the model entities `dimTags'. if
+-- `dim' is >= 0, only remove embedded entities of the given dimension
+-- (e.g. embedded points if `dim' == 0).
 gmshModelMeshRemoveEmbedded :: [(Int, Int)] -> Maybe Int -> IO()
 gmshModelMeshRemoveEmbedded dimTags dimMaybe = do
    withArrayPairLen dimTags $ \dimTags_n' dimTags' -> do
@@ -2344,6 +2929,9 @@ foreign import ccall safe "gmshc.h gmshModelMeshRemoveEmbedded"
       -> CInt
       -> Ptr CInt
       -> IO()
+
+-- Reorder the elements of type `elementType' classified on the entity
+-- of tag `tag' according to `ordering'.
 gmshModelMeshReorderElements :: Int -> Int -> [Int] -> IO()
 gmshModelMeshReorderElements elementType tag ordering = do
    let elementType' = fromIntegral elementType
@@ -2361,6 +2949,8 @@ foreign import ccall safe "gmshc.h gmshModelMeshReorderElements"
       -> CSize
       -> Ptr CInt
       -> IO()
+
+-- Renumber the node tags in a continuous sequence.
 gmshModelMeshRenumberNodes :: IO()
 gmshModelMeshRenumberNodes = do
    alloca $ \errptr -> do
@@ -2371,6 +2961,8 @@ foreign import ccall safe "gmshc.h gmshModelMeshRenumberNodes"
    cgmshModelMeshRenumberNodes
       :: Ptr CInt
       -> IO()
+
+-- Renumber the element tags in a continuous sequence.
 gmshModelMeshRenumberElements :: IO()
 gmshModelMeshRenumberElements = do
    alloca $ \errptr -> do
@@ -2381,6 +2973,15 @@ foreign import ccall safe "gmshc.h gmshModelMeshRenumberElements"
    cgmshModelMeshRenumberElements
       :: Ptr CInt
       -> IO()
+
+-- Set the meshes of the entities of dimension `dim' and tag `tags' as
+-- periodic copies of the meshes of entities `tagsMaster', using the
+-- affine transformation specified in `affineTransformation' (16
+-- entries of a 4x4 matrix, by row). If used after meshing, generate
+-- the periodic node correspondence information assuming the meshes of
+-- entities `tags' effectively match the meshes of entities
+-- `tagsMaster' (useful for structured and extruded meshes). Currently
+-- only available for @code{dim} == 1 and @code{dim} == 2.
 gmshModelMeshSetPeriodic :: Int -> [Int] -> [Int] -> [Double] -> IO()
 gmshModelMeshSetPeriodic dim tags tagsMaster affineTransform = do
    let dim' = fromIntegral dim
@@ -2402,6 +3003,11 @@ foreign import ccall safe "gmshc.h gmshModelMeshSetPeriodic"
       -> CSize
       -> Ptr CInt
       -> IO()
+
+-- Get the master entity `tagMaster', the node tags `nodeTags' and
+-- their corresponding master node tags `nodeTagsMaster', and the
+-- affine transform `affineTransform' for the entity of dimension
+-- `dim' and tag `tag'.
 gmshModelMeshGetPeriodicNodes :: Int -> Int -> IO(Int, [Int], [Int], [Double])
 gmshModelMeshGetPeriodicNodes dim tag = do
    let dim' = fromIntegral dim
@@ -2435,6 +3041,8 @@ foreign import ccall safe "gmshc.h gmshModelMeshGetPeriodicNodes"
       -> Ptr CSize
       -> Ptr CInt
       -> IO()
+
+-- Remove duplicate nodes in the mesh of the current model.
 gmshModelMeshRemoveDuplicateNodes :: IO()
 gmshModelMeshRemoveDuplicateNodes = do
    alloca $ \errptr -> do
@@ -2445,6 +3053,10 @@ foreign import ccall safe "gmshc.h gmshModelMeshRemoveDuplicateNodes"
    cgmshModelMeshRemoveDuplicateNodes
       :: Ptr CInt
       -> IO()
+
+-- Split (into two triangles) all quadrangles in surface `tag' whose
+-- quality is lower than `quality'. If `tag' < 0, split quadrangles in
+-- all surfaces.
 gmshModelMeshSplitQuadrangles :: Maybe Double -> Maybe Int -> IO()
 gmshModelMeshSplitQuadrangles qualityMaybe tagMaybe = do
    let quality = fromMaybe (1.0) qualityMaybe
@@ -2461,6 +3073,14 @@ foreign import ccall safe "gmshc.h gmshModelMeshSplitQuadrangles"
       -> CInt
       -> Ptr CInt
       -> IO()
+
+-- Classify ("color") the surface mesh based on the angle threshold
+-- `angle' (in radians), and create new discrete surfaces, curves and
+-- points accordingly. If `boundary' is set, also create discrete
+-- curves on the boundary if the surface is open. If
+-- `forReparametrization' is set, create edges and surfaces that can
+-- be reparametrized using a single map. If `curveAngle' is less than
+-- Pi, also force curves to be split according to `curveAngle'.
 gmshModelMeshClassifySurfaces :: Double -> Maybe Bool -> Maybe Bool -> Maybe Double -> IO()
 gmshModelMeshClassifySurfaces angle boundaryMaybe forReparametrizationMaybe curveAngleMaybe = do
    let angle' = realToFrac angle
@@ -2482,6 +3102,11 @@ foreign import ccall safe "gmshc.h gmshModelMeshClassifySurfaces"
       -> CDouble
       -> Ptr CInt
       -> IO()
+
+-- Create a parametrization for discrete curves and surfaces (i.e.
+-- curves and surfaces represented solely by a mesh, without an
+-- underlying CAD description), assuming that each can be parametrized
+-- with a single map.
 gmshModelMeshCreateGeometry :: IO()
 gmshModelMeshCreateGeometry = do
    alloca $ \errptr -> do
@@ -2492,6 +3117,10 @@ foreign import ccall safe "gmshc.h gmshModelMeshCreateGeometry"
    cgmshModelMeshCreateGeometry
       :: Ptr CInt
       -> IO()
+
+-- Create a boundary representation from the mesh if the model does
+-- not have one (e.g. when imported from mesh file formats with no
+-- BRep representation of the underlying model).
 gmshModelMeshCreateTopology :: IO()
 gmshModelMeshCreateTopology = do
    alloca $ \errptr -> do
@@ -2502,6 +3131,16 @@ foreign import ccall safe "gmshc.h gmshModelMeshCreateTopology"
    cgmshModelMeshCreateTopology
       :: Ptr CInt
       -> IO()
+
+-- Compute a basis representation for homology spaces after a mesh has
+-- been generated. The computation domain is given in a list of
+-- physical group tags `domainTags'; if empty, the whole mesh is the
+-- domain. The computation subdomain for relative homology computation
+-- is given in a list of physical group tags `subdomainTags'; if
+-- empty, absolute homology is computed. The dimensions homology bases
+-- to be computed are given in the list `dim'; if empty, all bases are
+-- computed. Resulting basis representation chains are stored as
+-- physical groups in the mesh.
 gmshModelMeshComputeHomology :: Maybe [Int] -> Maybe [Int] -> Maybe [Int] -> IO()
 gmshModelMeshComputeHomology domainTagsMaybe subdomainTagsMaybe dimsMaybe = do
    let domainTags = fromMaybe ([]) domainTagsMaybe
@@ -2524,6 +3163,16 @@ foreign import ccall safe "gmshc.h gmshModelMeshComputeHomology"
       -> CSize
       -> Ptr CInt
       -> IO()
+
+-- Compute a basis representation for cohomology spaces after a mesh
+-- has been generated. The computation domain is given in a list of
+-- physical group tags `domainTags'; if empty, the whole mesh is the
+-- domain. The computation subdomain for relative cohomology
+-- computation is given in a list of physical group tags
+-- `subdomainTags'; if empty, absolute cohomology is computed. The
+-- dimensions homology bases to be computed are given in the list
+-- `dim'; if empty, all bases are computed. Resulting basis
+-- representation cochains are stored as physical groups in the mesh.
 gmshModelMeshComputeCohomology :: Maybe [Int] -> Maybe [Int] -> Maybe [Int] -> IO()
 gmshModelMeshComputeCohomology domainTagsMaybe subdomainTagsMaybe dimsMaybe = do
    let domainTags = fromMaybe ([]) domainTagsMaybe
@@ -2546,6 +3195,10 @@ foreign import ccall safe "gmshc.h gmshModelMeshComputeCohomology"
       -> CSize
       -> Ptr CInt
       -> IO()
+
+-- Compute a cross field for the current mesh. The function creates 3
+-- views: the H function, the Theta function and cross directions.
+-- Return the tags of the views
 gmshModelMeshComputeCrossField :: IO([Int])
 gmshModelMeshComputeCrossField = do
    alloca $ \viewTags' -> do
@@ -2561,6 +3214,15 @@ foreign import ccall safe "gmshc.h gmshModelMeshComputeCrossField"
       -> Ptr CSize
       -> Ptr CInt
       -> IO()
+
+
+----------------------------
+-- mesh size field functions
+----------------------------
+
+-- Add a new mesh size field of type `fieldType'. If `tag' is
+-- positive, assign the tag explicitly; otherwise a new tag is
+-- assigned automatically. Return the field tag.
 gmshModelMeshFieldAdd :: String -> Maybe Int -> IO(Int)
 gmshModelMeshFieldAdd fieldType tagMaybe = do
    withCString fieldType $ \fieldType' -> do
@@ -2577,6 +3239,8 @@ foreign import ccall safe "gmshc.h gmshModelMeshFieldAdd"
       -> CInt
       -> Ptr CInt
       -> IO(CInt)
+
+-- Remove the field with tag `tag'.
 gmshModelMeshFieldRemove :: Int -> IO()
 gmshModelMeshFieldRemove tag = do
    let tag' = fromIntegral tag
@@ -2589,6 +3253,8 @@ foreign import ccall safe "gmshc.h gmshModelMeshFieldRemove"
       :: CInt
       -> Ptr CInt
       -> IO()
+
+-- Set the numerical option `option' to value `value' for field `tag'.
 gmshModelMeshFieldSetNumber :: Int -> String -> Double -> IO()
 gmshModelMeshFieldSetNumber tag option value = do
    let tag' = fromIntegral tag
@@ -2605,6 +3271,8 @@ foreign import ccall safe "gmshc.h gmshModelMeshFieldSetNumber"
       -> CDouble
       -> Ptr CInt
       -> IO()
+
+-- Set the string option `option' to value `value' for field `tag'.
 gmshModelMeshFieldSetString :: Int -> String -> String -> IO()
 gmshModelMeshFieldSetString tag option value = do
    let tag' = fromIntegral tag
@@ -2621,6 +3289,9 @@ foreign import ccall safe "gmshc.h gmshModelMeshFieldSetString"
       -> CString
       -> Ptr CInt
       -> IO()
+
+-- Set the numerical list option `option' to value `value' for field
+-- `tag'.
 gmshModelMeshFieldSetNumbers :: Int -> String -> [Double] -> IO()
 gmshModelMeshFieldSetNumbers tag option value = do
    let tag' = fromIntegral tag
@@ -2638,6 +3309,8 @@ foreign import ccall safe "gmshc.h gmshModelMeshFieldSetNumbers"
       -> CSize
       -> Ptr CInt
       -> IO()
+
+-- Set the field `tag' as the background mesh size field.
 gmshModelMeshFieldSetAsBackgroundMesh :: Int -> IO()
 gmshModelMeshFieldSetAsBackgroundMesh tag = do
    let tag' = fromIntegral tag
@@ -2650,6 +3323,8 @@ foreign import ccall safe "gmshc.h gmshModelMeshFieldSetAsBackgroundMesh"
       :: CInt
       -> Ptr CInt
       -> IO()
+
+-- Set the field `tag' as a boundary layer size field.
 gmshModelMeshFieldSetAsBoundaryLayer :: Int -> IO()
 gmshModelMeshFieldSetAsBoundaryLayer tag = do
    let tag' = fromIntegral tag
@@ -2662,6 +3337,19 @@ foreign import ccall safe "gmshc.h gmshModelMeshFieldSetAsBoundaryLayer"
       :: CInt
       -> Ptr CInt
       -> IO()
+
+
+--------------------------------
+-- built-in CAD kernel functions
+--------------------------------
+
+-- Add a geometrical point in the built-in CAD representation, at
+-- coordinates (`x', `y', `z'). If `meshSize' is > 0, add a meshing
+-- constraint at that point. If `tag' is positive, set the tag
+-- explicitly; otherwise a new tag is selected automatically. Return
+-- the tag of the point. (Note that the point will be added in the
+-- current model only after `synchronize' is called. This behavior
+-- holds for all the entities added in the geo module.)
 gmshModelGeoAddPoint :: Double -> Double -> Double -> Maybe Double -> Maybe Int -> IO(Int)
 gmshModelGeoAddPoint x y z meshSizeMaybe tagMaybe = do
    let x' = realToFrac x
@@ -2685,6 +3373,11 @@ foreign import ccall safe "gmshc.h gmshModelGeoAddPoint"
       -> CInt
       -> Ptr CInt
       -> IO(CInt)
+
+-- Add a straight line segment between the two points with tags
+-- `startTag' and `endTag'. If `tag' is positive, set the tag
+-- explicitly; otherwise a new tag is selected automatically. Return
+-- the tag of the line.
 gmshModelGeoAddLine :: Int -> Int -> Maybe Int -> IO(Int)
 gmshModelGeoAddLine startTag endTag tagMaybe = do
    let startTag' = fromIntegral startTag
@@ -2703,6 +3396,13 @@ foreign import ccall safe "gmshc.h gmshModelGeoAddLine"
       -> CInt
       -> Ptr CInt
       -> IO(CInt)
+
+-- Add a circle arc (strictly smaller than Pi) between the two points
+-- with tags `startTag' and `endTag', with center `centertag'. If
+-- `tag' is positive, set the tag explicitly; otherwise a new tag is
+-- selected automatically. If (`nx', `ny', `nz') != (0, 0, 0),
+-- explicitly set the plane of the circle arc. Return the tag of the
+-- circle arc.
 gmshModelGeoAddCircleArc :: Int -> Int -> Int -> Maybe Int -> Maybe Double -> Maybe Double -> Maybe Double -> IO(Int)
 gmshModelGeoAddCircleArc startTag centerTag endTag tagMaybe nxMaybe nyMaybe nzMaybe = do
    let startTag' = fromIntegral startTag
@@ -2732,6 +3432,13 @@ foreign import ccall safe "gmshc.h gmshModelGeoAddCircleArc"
       -> CDouble
       -> Ptr CInt
       -> IO(CInt)
+
+-- Add an ellipse arc (strictly smaller than Pi) between the two
+-- points `startTag' and `endTag', with center `centerTag' and major
+-- axis point `majorTag'. If `tag' is positive, set the tag
+-- explicitly; otherwise a new tag is selected automatically. If
+-- (`nx', `ny', `nz') != (0, 0, 0), explicitly set the plane of the
+-- circle arc. Return the tag of the ellipse arc.
 gmshModelGeoAddEllipseArc :: Int -> Int -> Int -> Int -> Maybe Int -> Maybe Double -> Maybe Double -> Maybe Double -> IO(Int)
 gmshModelGeoAddEllipseArc startTag centerTag majorTag endTag tagMaybe nxMaybe nyMaybe nzMaybe = do
    let startTag' = fromIntegral startTag
@@ -2763,6 +3470,12 @@ foreign import ccall safe "gmshc.h gmshModelGeoAddEllipseArc"
       -> CDouble
       -> Ptr CInt
       -> IO(CInt)
+
+-- Add a spline (Catmull-Rom) curve going through the points
+-- `pointTags'. If `tag' is positive, set the tag explicitly;
+-- otherwise a new tag is selected automatically. Create a periodic
+-- curve if the first and last points are the same. Return the tag of
+-- the spline curve.
 gmshModelGeoAddSpline :: [Int] -> Maybe Int -> IO(Int)
 gmshModelGeoAddSpline pointTags tagMaybe = do
    withArrayIntLen pointTags $ \pointTags_n' pointTags' -> do
@@ -2780,6 +3493,11 @@ foreign import ccall safe "gmshc.h gmshModelGeoAddSpline"
       -> CInt
       -> Ptr CInt
       -> IO(CInt)
+
+-- Add a cubic b-spline curve with `pointTags' control points. If
+-- `tag' is positive, set the tag explicitly; otherwise a new tag is
+-- selected automatically. Creates a periodic curve if the first and
+-- last points are the same. Return the tag of the b-spline curve.
 gmshModelGeoAddBSpline :: [Int] -> Maybe Int -> IO(Int)
 gmshModelGeoAddBSpline pointTags tagMaybe = do
    withArrayIntLen pointTags $ \pointTags_n' pointTags' -> do
@@ -2797,6 +3515,10 @@ foreign import ccall safe "gmshc.h gmshModelGeoAddBSpline"
       -> CInt
       -> Ptr CInt
       -> IO(CInt)
+
+-- Add a Bezier curve with `pointTags' control points. If `tag' is
+-- positive, set the tag explicitly; otherwise a new tag is selected
+-- automatically.  Return the tag of the Bezier curve.
 gmshModelGeoAddBezier :: [Int] -> Maybe Int -> IO(Int)
 gmshModelGeoAddBezier pointTags tagMaybe = do
    withArrayIntLen pointTags $ \pointTags_n' pointTags' -> do
@@ -2814,6 +3536,12 @@ foreign import ccall safe "gmshc.h gmshModelGeoAddBezier"
       -> CInt
       -> Ptr CInt
       -> IO(CInt)
+
+-- Add a spline (Catmull-Rom) going through points sampling the curves
+-- in `curveTags'. The density of sampling points on each curve is
+-- governed by `numIntervals'. If `tag' is positive, set the tag
+-- explicitly; otherwise a new tag is selected automatically. Return
+-- the tag of the spline.
 gmshModelGeoAddCompoundSpline :: [Int] -> Maybe Int -> Maybe Int -> IO(Int)
 gmshModelGeoAddCompoundSpline curveTags numIntervalsMaybe tagMaybe = do
    withArrayIntLen curveTags $ \curveTags_n' curveTags' -> do
@@ -2834,6 +3562,12 @@ foreign import ccall safe "gmshc.h gmshModelGeoAddCompoundSpline"
       -> CInt
       -> Ptr CInt
       -> IO(CInt)
+
+-- Add a b-spline with control points sampling the curves in
+-- `curveTags'. The density of sampling points on each curve is
+-- governed by `numIntervals'. If `tag' is positive, set the tag
+-- explicitly; otherwise a new tag is selected automatically. Return
+-- the tag of the b-spline.
 gmshModelGeoAddCompoundBSpline :: [Int] -> Maybe Int -> Maybe Int -> IO(Int)
 gmshModelGeoAddCompoundBSpline curveTags numIntervalsMaybe tagMaybe = do
    withArrayIntLen curveTags $ \curveTags_n' curveTags' -> do
@@ -2854,6 +3588,13 @@ foreign import ccall safe "gmshc.h gmshModelGeoAddCompoundBSpline"
       -> CInt
       -> Ptr CInt
       -> IO(CInt)
+
+-- Add a curve loop (a closed wire) formed by the curves `curveTags'.
+-- `curveTags' should contain (signed) tags of model enties of
+-- dimension 1 forming a closed loop: a negative tag signifies that
+-- the underlying curve is considered with reversed orientation. If
+-- `tag' is positive, set the tag explicitly; otherwise a new tag is
+-- selected automatically. Return the tag of the curve loop.
 gmshModelGeoAddCurveLoop :: [Int] -> Maybe Int -> IO(Int)
 gmshModelGeoAddCurveLoop curveTags tagMaybe = do
    withArrayIntLen curveTags $ \curveTags_n' curveTags' -> do
@@ -2871,6 +3612,12 @@ foreign import ccall safe "gmshc.h gmshModelGeoAddCurveLoop"
       -> CInt
       -> Ptr CInt
       -> IO(CInt)
+
+-- Add a plane surface defined by one or more curve loops `wireTags'.
+-- The first curve loop defines the exterior contour; additional curve
+-- loop define holes. If `tag' is positive, set the tag explicitly;
+-- otherwise a new tag is selected automatically. Return the tag of
+-- the surface.
 gmshModelGeoAddPlaneSurface :: [Int] -> Maybe Int -> IO(Int)
 gmshModelGeoAddPlaneSurface wireTags tagMaybe = do
    withArrayIntLen wireTags $ \wireTags_n' wireTags' -> do
@@ -2888,6 +3635,12 @@ foreign import ccall safe "gmshc.h gmshModelGeoAddPlaneSurface"
       -> CInt
       -> Ptr CInt
       -> IO(CInt)
+
+-- Add a surface filling the curve loops in `wireTags'. Currently only
+-- a single curve loop is supported; this curve loop should be
+-- composed by 3 or 4 curves only. If `tag' is positive, set the tag
+-- explicitly; otherwise a new tag is selected automatically. Return
+-- the tag of the surface.
 gmshModelGeoAddSurfaceFilling :: [Int] -> Maybe Int -> Maybe Int -> IO(Int)
 gmshModelGeoAddSurfaceFilling wireTags tagMaybe sphereCenterTagMaybe = do
    withArrayIntLen wireTags $ \wireTags_n' wireTags' -> do
@@ -2908,6 +3661,10 @@ foreign import ccall safe "gmshc.h gmshModelGeoAddSurfaceFilling"
       -> CInt
       -> Ptr CInt
       -> IO(CInt)
+
+-- Add a surface loop (a closed shell) formed by `surfaceTags'.  If
+-- `tag' is positive, set the tag explicitly; otherwise a new tag is
+-- selected automatically. Return the tag of the shell.
 gmshModelGeoAddSurfaceLoop :: [Int] -> Maybe Int -> IO(Int)
 gmshModelGeoAddSurfaceLoop surfaceTags tagMaybe = do
    withArrayIntLen surfaceTags $ \surfaceTags_n' surfaceTags' -> do
@@ -2925,6 +3682,12 @@ foreign import ccall safe "gmshc.h gmshModelGeoAddSurfaceLoop"
       -> CInt
       -> Ptr CInt
       -> IO(CInt)
+
+-- Add a volume (a region) defined by one or more shells `shellTags'.
+-- The first surface loop defines the exterior boundary; additional
+-- surface loop define holes. If `tag' is positive, set the tag
+-- explicitly; otherwise a new tag is selected automatically. Return
+-- the tag of the volume.
 gmshModelGeoAddVolume :: [Int] -> Maybe Int -> IO(Int)
 gmshModelGeoAddVolume shellTags tagMaybe = do
    withArrayIntLen shellTags $ \shellTags_n' shellTags' -> do
@@ -2942,6 +3705,14 @@ foreign import ccall safe "gmshc.h gmshModelGeoAddVolume"
       -> CInt
       -> Ptr CInt
       -> IO(CInt)
+
+-- Extrude the model entities `dimTags' by translation along (`dx',
+-- `dy', `dz'). Return extruded entities in `outDimTags'. If
+-- `numElements' is not empty, also extrude the mesh: the entries in
+-- `numElements' give the number of elements in each layer. If
+-- `height' is not empty, it provides the (cumulative) height of the
+-- different layers, normalized to 1. If `dx' == `dy' == `dz' == 0,
+-- the entities are extruded along their normal.
 gmshModelGeoExtrude :: [(Int, Int)] -> Double -> Double -> Double -> Maybe [Int] -> Maybe [Double] -> Maybe Bool -> IO([(Int,Int)])
 gmshModelGeoExtrude dimTags dx dy dz numElementsMaybe heightsMaybe recombineMaybe = do
    withArrayPairLen dimTags $ \dimTags_n' dimTags' -> do
@@ -2977,6 +3748,15 @@ foreign import ccall safe "gmshc.h gmshModelGeoExtrude"
       -> CBool
       -> Ptr CInt
       -> IO()
+
+-- Extrude the model entities `dimTags' by rotation of `angle' radians
+-- around the axis of revolution defined by the point (`x', `y', `z')
+-- and the direction (`ax', `ay', `az'). The angle should be strictly
+-- smaller than Pi. Return extruded entities in `outDimTags'. If
+-- `numElements' is not empty, also extrude the mesh: the entries in
+-- `numElements' give the number of elements in each layer. If
+-- `height' is not empty, it provides the (cumulative) height of the
+-- different layers, normalized to 1.
 gmshModelGeoRevolve :: [(Int, Int)] -> Double -> Double -> Double -> Double -> Double -> Double -> Double -> Maybe [Int] -> Maybe [Double] -> Maybe Bool -> IO([(Int,Int)])
 gmshModelGeoRevolve dimTags x y z ax ay az angle numElementsMaybe heightsMaybe recombineMaybe = do
    withArrayPairLen dimTags $ \dimTags_n' dimTags' -> do
@@ -3020,6 +3800,16 @@ foreign import ccall safe "gmshc.h gmshModelGeoRevolve"
       -> CBool
       -> Ptr CInt
       -> IO()
+
+-- Extrude the model entities `dimTags' by a combined translation and
+-- rotation of `angle' radians, along (`dx', `dy', `dz') and around
+-- the axis of revolution defined by the point (`x', `y', `z') and the
+-- direction (`ax', `ay', `az'). The angle should be strictly smaller
+-- than Pi. Return extruded entities in `outDimTags'. If `numElements'
+-- is not empty, also extrude the mesh: the entries in `numElements'
+-- give the number of elements in each layer. If `height' is not
+-- empty, it provides the (cumulative) height of the different layers,
+-- normalized to 1.
 gmshModelGeoTwist :: [(Int, Int)] -> Double -> Double -> Double -> Double -> Double -> Double -> Double -> Double -> Double -> Double -> Maybe [Int] -> Maybe [Double] -> Maybe Bool -> IO([(Int,Int)])
 gmshModelGeoTwist dimTags x y z dx dy dz ax ay az angle numElementsMaybe heightsMaybe recombineMaybe = do
    withArrayPairLen dimTags $ \dimTags_n' dimTags' -> do
@@ -3069,6 +3859,8 @@ foreign import ccall safe "gmshc.h gmshModelGeoTwist"
       -> CBool
       -> Ptr CInt
       -> IO()
+
+-- Translate the model entities `dimTags' along (`dx', `dy', `dz').
 gmshModelGeoTranslate :: [(Int, Int)] -> Double -> Double -> Double -> IO()
 gmshModelGeoTranslate dimTags dx dy dz = do
    withArrayPairLen dimTags $ \dimTags_n' dimTags' -> do
@@ -3088,6 +3880,10 @@ foreign import ccall safe "gmshc.h gmshModelGeoTranslate"
       -> CDouble
       -> Ptr CInt
       -> IO()
+
+-- Rotate the model entities `dimTags' of `angle' radians around the
+-- axis of revolution defined by the point (`x', `y', `z') and the
+-- direction (`ax', `ay', `az').
 gmshModelGeoRotate :: [(Int, Int)] -> Double -> Double -> Double -> Double -> Double -> Double -> Double -> IO()
 gmshModelGeoRotate dimTags x y z ax ay az angle = do
    withArrayPairLen dimTags $ \dimTags_n' dimTags' -> do
@@ -3115,6 +3911,10 @@ foreign import ccall safe "gmshc.h gmshModelGeoRotate"
       -> CDouble
       -> Ptr CInt
       -> IO()
+
+-- Scale the model entities `dimTag' by factors `a', `b' and `c' along
+-- the three coordinate axes; use (`x', `y', `z') as the center of the
+-- homothetic transformation.
 gmshModelGeoDilate :: [(Int, Int)] -> Double -> Double -> Double -> Double -> Double -> Double -> IO()
 gmshModelGeoDilate dimTags x y z a b c = do
    withArrayPairLen dimTags $ \dimTags_n' dimTags' -> do
@@ -3140,6 +3940,9 @@ foreign import ccall safe "gmshc.h gmshModelGeoDilate"
       -> CDouble
       -> Ptr CInt
       -> IO()
+
+-- Mirror the model entities `dimTag', with respect to the plane of
+-- equation `a' * x + `b' * y + `c' * z + `d' = 0.
 gmshModelGeoMirror :: [(Int, Int)] -> Double -> Double -> Double -> Double -> IO()
 gmshModelGeoMirror dimTags a b c d = do
    withArrayPairLen dimTags $ \dimTags_n' dimTags' -> do
@@ -3161,6 +3964,10 @@ foreign import ccall safe "gmshc.h gmshModelGeoMirror"
       -> CDouble
       -> Ptr CInt
       -> IO()
+
+-- Mirror the model entities `dimTag', with respect to the plane of
+-- equation `a' * x + `b' * y + `c' * z + `d' = 0. (This is a synonym
+-- for `mirror', which will be deprecated in a future release.)
 gmshModelGeoSymmetrize :: [(Int, Int)] -> Double -> Double -> Double -> Double -> IO()
 gmshModelGeoSymmetrize dimTags a b c d = do
    withArrayPairLen dimTags $ \dimTags_n' dimTags' -> do
@@ -3182,6 +3989,9 @@ foreign import ccall safe "gmshc.h gmshModelGeoSymmetrize"
       -> CDouble
       -> Ptr CInt
       -> IO()
+
+-- Copy the entities `dimTags'; the new entities are returned in
+-- `outDimTags'.
 gmshModelGeoCopy :: [(Int, Int)] -> IO([(Int,Int)])
 gmshModelGeoCopy dimTags = do
    withArrayPairLen dimTags $ \dimTags_n' dimTags' -> do
@@ -3200,6 +4010,9 @@ foreign import ccall safe "gmshc.h gmshModelGeoCopy"
       -> Ptr CSize
       -> Ptr CInt
       -> IO()
+
+-- Remove the entities `dimTags'. If `recursive' is true, remove all
+-- the entities on their boundaries, down to dimension 0.
 gmshModelGeoRemove :: [(Int, Int)] -> Maybe Bool -> IO()
 gmshModelGeoRemove dimTags recursiveMaybe = do
    withArrayPairLen dimTags $ \dimTags_n' dimTags' -> do
@@ -3216,6 +4029,9 @@ foreign import ccall safe "gmshc.h gmshModelGeoRemove"
       -> CBool
       -> Ptr CInt
       -> IO()
+
+-- Remove all duplicate entities (different entities at the same
+-- geometrical location).
 gmshModelGeoRemoveAllDuplicates :: IO()
 gmshModelGeoRemoveAllDuplicates = do
    alloca $ \errptr -> do
@@ -3226,6 +4042,10 @@ foreign import ccall safe "gmshc.h gmshModelGeoRemoveAllDuplicates"
    cgmshModelGeoRemoveAllDuplicates
       :: Ptr CInt
       -> IO()
+
+-- Split the model curve of tag `tag' on the control points
+-- `pointTags'. Return the tags `curveTags' of the newly created
+-- curves.
 gmshModelGeoSplitCurve :: Int -> [Int] -> IO([Int])
 gmshModelGeoSplitCurve tag pointTags = do
    let tag' = fromIntegral tag
@@ -3246,6 +4066,11 @@ foreign import ccall safe "gmshc.h gmshModelGeoSplitCurve"
       -> Ptr CSize
       -> Ptr CInt
       -> IO()
+
+-- Synchronize the built-in CAD representation with the current Gmsh
+-- model. This can be called at any time, but since it involves a non
+-- trivial amount of processing, the number of synchronization points
+-- should normally be minimized.
 gmshModelGeoSynchronize :: IO()
 gmshModelGeoSynchronize = do
    alloca $ \errptr -> do
@@ -3256,6 +4081,14 @@ foreign import ccall safe "gmshc.h gmshModelGeoSynchronize"
    cgmshModelGeoSynchronize
       :: Ptr CInt
       -> IO()
+
+
+------------------------------------------
+-- built-in CAD kernel meshing constraints
+------------------------------------------
+
+-- Set a mesh size constraint on the model entities `dimTags'.
+-- Currently only entities of dimension 0 (points) are handled.
 gmshModelGeoMeshSetSize :: [(Int, Int)] -> Double -> IO()
 gmshModelGeoMeshSetSize dimTags size = do
    withArrayPairLen dimTags $ \dimTags_n' dimTags' -> do
@@ -3271,6 +4104,12 @@ foreign import ccall safe "gmshc.h gmshModelGeoMeshSetSize"
       -> CDouble
       -> Ptr CInt
       -> IO()
+
+-- Set a transfinite meshing constraint on the curve `tag', with
+-- `numNodes' nodes distributed according to `meshType' and `coef'.
+-- Currently supported types are "Progression" (geometrical
+-- progression with power `coef') and "Bump" (refinement toward both
+-- extremities of the curve).
 gmshModelGeoMeshSetTransfiniteCurve :: Int -> Int -> Maybe String -> Maybe Double -> IO()
 gmshModelGeoMeshSetTransfiniteCurve tag nPoints meshTypeMaybe coefMaybe = do
    let tag' = fromIntegral tag
@@ -3291,6 +4130,15 @@ foreign import ccall safe "gmshc.h gmshModelGeoMeshSetTransfiniteCurve"
       -> CDouble
       -> Ptr CInt
       -> IO()
+
+-- Set a transfinite meshing constraint on the surface `tag'.
+-- `arrangement' describes the arrangement of the triangles when the
+-- surface is not flagged as recombined: currently supported values
+-- are "Left", "Right", "AlternateLeft" and "AlternateRight".
+-- `cornerTags' can be used to specify the (3 or 4) corners of the
+-- transfinite interpolation explicitly; specifying the corners
+-- explicitly is mandatory if the surface has more that 3 or 4 points
+-- on its boundary.
 gmshModelGeoMeshSetTransfiniteSurface :: Int -> Maybe String -> Maybe [Int] -> IO()
 gmshModelGeoMeshSetTransfiniteSurface tag arrangementMaybe cornerTagsMaybe = do
    let tag' = fromIntegral tag
@@ -3310,6 +4158,10 @@ foreign import ccall safe "gmshc.h gmshModelGeoMeshSetTransfiniteSurface"
       -> CSize
       -> Ptr CInt
       -> IO()
+
+-- Set a transfinite meshing constraint on the surface `tag'.
+-- `cornerTags' can be used to specify the (6 or 8) corners of the
+-- transfinite interpolation explicitly.
 gmshModelGeoMeshSetTransfiniteVolume :: Int -> Maybe [Int] -> IO()
 gmshModelGeoMeshSetTransfiniteVolume tag cornerTagsMaybe = do
    let tag' = fromIntegral tag
@@ -3326,6 +4178,10 @@ foreign import ccall safe "gmshc.h gmshModelGeoMeshSetTransfiniteVolume"
       -> CSize
       -> Ptr CInt
       -> IO()
+
+-- Set a recombination meshing constraint on the model entity of
+-- dimension `dim' and tag `tag'. Currently only entities of dimension
+-- 2 (to recombine triangles into quadrangles) are supported.
 gmshModelGeoMeshSetRecombine :: Int -> Int -> Maybe Double -> IO()
 gmshModelGeoMeshSetRecombine dim tag angleMaybe = do
    let dim' = fromIntegral dim
@@ -3343,6 +4199,10 @@ foreign import ccall safe "gmshc.h gmshModelGeoMeshSetRecombine"
       -> CDouble
       -> Ptr CInt
       -> IO()
+
+-- Set a smoothing meshing constraint on the model entity of dimension
+-- `dim' and tag `tag'. `val' iterations of a Laplace smoother are
+-- applied.
 gmshModelGeoMeshSetSmoothing :: Int -> Int -> Int -> IO()
 gmshModelGeoMeshSetSmoothing dim tag val = do
    let dim' = fromIntegral dim
@@ -3359,6 +4219,12 @@ foreign import ccall safe "gmshc.h gmshModelGeoMeshSetSmoothing"
       -> CInt
       -> Ptr CInt
       -> IO()
+
+-- Set a reverse meshing constraint on the model entity of dimension
+-- `dim' and tag `tag'. If `val' is true, the mesh orientation will be
+-- reversed with respect to the natural mesh orientation (i.e. the
+-- orientation consistent with the orientation of the geometry). If
+-- `val' is false, the mesh is left as-is.
 gmshModelGeoMeshSetReverse :: Int -> Int -> Maybe Bool -> IO()
 gmshModelGeoMeshSetReverse dim tag valMaybe = do
    let dim' = fromIntegral dim
@@ -3376,6 +4242,9 @@ foreign import ccall safe "gmshc.h gmshModelGeoMeshSetReverse"
       -> CBool
       -> Ptr CInt
       -> IO()
+
+-- Set the meshing algorithm on the model entity of dimension `dim'
+-- and tag `tag'. Currently only supported for `dim' == 2.
 gmshModelGeoMeshSetAlgorithm :: Int -> Int -> Int -> IO()
 gmshModelGeoMeshSetAlgorithm dim tag val = do
    let dim' = fromIntegral dim
@@ -3392,6 +4261,10 @@ foreign import ccall safe "gmshc.h gmshModelGeoMeshSetAlgorithm"
       -> CInt
       -> Ptr CInt
       -> IO()
+
+-- Force the mesh size to be extended from the boundary, or not, for
+-- the model entity of dimension `dim' and tag `tag'. Currently only
+-- supported for `dim' == 2.
 gmshModelGeoMeshSetSizeFromBoundary :: Int -> Int -> Int -> IO()
 gmshModelGeoMeshSetSizeFromBoundary dim tag val = do
    let dim' = fromIntegral dim
@@ -3408,6 +4281,19 @@ foreign import ccall safe "gmshc.h gmshModelGeoMeshSetSizeFromBoundary"
       -> CInt
       -> Ptr CInt
       -> IO()
+
+
+-----------------------------------
+-- OpenCASCADE CAD kernel functions
+-----------------------------------
+
+-- Add a geometrical point in the OpenCASCADE CAD representation, at
+-- coordinates (`x', `y', `z'). If `meshSize' is > 0, add a meshing
+-- constraint at that point. If `tag' is positive, set the tag
+-- explicitly; otherwise a new tag is selected automatically. Return
+-- the tag of the point. (Note that the point will be added in the
+-- current model only after `synchronize' is called. This behavior
+-- holds for all the entities added in the occ module.)
 gmshModelOccAddPoint :: Double -> Double -> Double -> Maybe Double -> Maybe Int -> IO(Int)
 gmshModelOccAddPoint x y z meshSizeMaybe tagMaybe = do
    let x' = realToFrac x
@@ -3431,6 +4317,11 @@ foreign import ccall safe "gmshc.h gmshModelOccAddPoint"
       -> CInt
       -> Ptr CInt
       -> IO(CInt)
+
+-- Add a straight line segment between the two points with tags
+-- `startTag' and `endTag'. If `tag' is positive, set the tag
+-- explicitly; otherwise a new tag is selected automatically. Return
+-- the tag of the line.
 gmshModelOccAddLine :: Int -> Int -> Maybe Int -> IO(Int)
 gmshModelOccAddLine startTag endTag tagMaybe = do
    let startTag' = fromIntegral startTag
@@ -3449,6 +4340,11 @@ foreign import ccall safe "gmshc.h gmshModelOccAddLine"
       -> CInt
       -> Ptr CInt
       -> IO(CInt)
+
+-- Add a circle arc between the two points with tags `startTag' and
+-- `endTag', with center `centerTag'. If `tag' is positive, set the
+-- tag explicitly; otherwise a new tag is selected automatically.
+-- Return the tag of the circle arc.
 gmshModelOccAddCircleArc :: Int -> Int -> Int -> Maybe Int -> IO(Int)
 gmshModelOccAddCircleArc startTag centerTag endTag tagMaybe = do
    let startTag' = fromIntegral startTag
@@ -3469,6 +4365,11 @@ foreign import ccall safe "gmshc.h gmshModelOccAddCircleArc"
       -> CInt
       -> Ptr CInt
       -> IO(CInt)
+
+-- Add a circle of center (`x', `y', `z') and radius `r'. If `tag' is
+-- positive, set the tag explicitly; otherwise a new tag is selected
+-- automatically. If `angle1' and `angle2' are specified, create a
+-- circle arc between the two angles. Return the tag of the circle.
 gmshModelOccAddCircle :: Double -> Double -> Double -> Double -> Maybe Int -> Maybe Double -> Maybe Double -> IO(Int)
 gmshModelOccAddCircle x y z r tagMaybe angle1Maybe angle2Maybe = do
    let x' = realToFrac x
@@ -3497,6 +4398,13 @@ foreign import ccall safe "gmshc.h gmshModelOccAddCircle"
       -> CDouble
       -> Ptr CInt
       -> IO(CInt)
+
+-- Add an ellipse arc between the two points `startTag' and `endTag',
+-- with center `centerTag' and major axis point `majorTag'. If `tag'
+-- is positive, set the tag explicitly; otherwise a new tag is
+-- selected automatically. Return the tag of the ellipse arc. Note
+-- that OpenCASCADE does not allow creating ellipse arcs with the
+-- major radius smaller than the minor radius.
 gmshModelOccAddEllipseArc :: Int -> Int -> Int -> Int -> Maybe Int -> IO(Int)
 gmshModelOccAddEllipseArc startTag centerTag majorTag endTag tagMaybe = do
    let startTag' = fromIntegral startTag
@@ -3519,6 +4427,15 @@ foreign import ccall safe "gmshc.h gmshModelOccAddEllipseArc"
       -> CInt
       -> Ptr CInt
       -> IO(CInt)
+
+-- Add an ellipse of center (`x', `y', `z') and radii `r1' and `r2'
+-- along the x- and y-axes respectively. If `tag' is positive, set the
+-- tag explicitly; otherwise a new tag is selected automatically. If
+-- `angle1' and `angle2' are specified, create an ellipse arc between
+-- the two angles. Return the tag of the ellipse. Note that
+-- OpenCASCADE does not allow creating ellipses with the major radius
+-- (along the x-axis) smaller than or equal to the minor radius (along
+-- the y-axis): rotate the shape or use `addCircle' in such cases.
 gmshModelOccAddEllipse :: Double -> Double -> Double -> Double -> Double -> Maybe Int -> Maybe Double -> Maybe Double -> IO(Int)
 gmshModelOccAddEllipse x y z r1 r2 tagMaybe angle1Maybe angle2Maybe = do
    let x' = realToFrac x
@@ -3549,6 +4466,12 @@ foreign import ccall safe "gmshc.h gmshModelOccAddEllipse"
       -> CDouble
       -> Ptr CInt
       -> IO(CInt)
+
+-- Add a spline (C2 b-spline) curve going through the points
+-- `pointTags'. If `tag' is positive, set the tag explicitly;
+-- otherwise a new tag is selected automatically. Create a periodic
+-- curve if the first and last points are the same. Return the tag of
+-- the spline curve.
 gmshModelOccAddSpline :: [Int] -> Maybe Int -> IO(Int)
 gmshModelOccAddSpline pointTags tagMaybe = do
    withArrayIntLen pointTags $ \pointTags_n' pointTags' -> do
@@ -3566,6 +4489,13 @@ foreign import ccall safe "gmshc.h gmshModelOccAddSpline"
       -> CInt
       -> Ptr CInt
       -> IO(CInt)
+
+-- Add a b-spline curve of degree `degree' with `pointTags' control
+-- points. If `weights', `knots' or `multiplicities' are not provided,
+-- default parameters are computed automatically. If `tag' is
+-- positive, set the tag explicitly; otherwise a new tag is selected
+-- automatically. Create a periodic curve if the first and last points
+-- are the same. Return the tag of the b-spline curve.
 gmshModelOccAddBSpline :: [Int] -> Maybe Int -> Maybe Int -> Maybe [Double] -> Maybe [Double] -> Maybe [Int] -> IO(Int)
 gmshModelOccAddBSpline pointTags tagMaybe degreeMaybe weightsMaybe knotsMaybe multiplicitiesMaybe = do
    withArrayIntLen pointTags $ \pointTags_n' pointTags' -> do
@@ -3598,6 +4528,10 @@ foreign import ccall safe "gmshc.h gmshModelOccAddBSpline"
       -> CSize
       -> Ptr CInt
       -> IO(CInt)
+
+-- Add a Bezier curve with `pointTags' control points. If `tag' is
+-- positive, set the tag explicitly; otherwise a new tag is selected
+-- automatically. Return the tag of the Bezier curve.
 gmshModelOccAddBezier :: [Int] -> Maybe Int -> IO(Int)
 gmshModelOccAddBezier pointTags tagMaybe = do
    withArrayIntLen pointTags $ \pointTags_n' pointTags' -> do
@@ -3615,6 +4549,12 @@ foreign import ccall safe "gmshc.h gmshModelOccAddBezier"
       -> CInt
       -> Ptr CInt
       -> IO(CInt)
+
+-- Add a wire (open or closed) formed by the curves `curveTags'. Note
+-- that an OpenCASCADE wire can be made of curves that share
+-- geometrically identical (but topologically different) points. If
+-- `tag' is positive, set the tag explicitly; otherwise a new tag is
+-- selected automatically. Return the tag of the wire.
 gmshModelOccAddWire :: [Int] -> Maybe Int -> Maybe Bool -> IO(Int)
 gmshModelOccAddWire curveTags tagMaybe checkClosedMaybe = do
    withArrayIntLen curveTags $ \curveTags_n' curveTags' -> do
@@ -3635,6 +4575,13 @@ foreign import ccall safe "gmshc.h gmshModelOccAddWire"
       -> CBool
       -> Ptr CInt
       -> IO(CInt)
+
+-- Add a curve loop (a closed wire) formed by the curves `curveTags'.
+-- `curveTags' should contain tags of curves forming a closed loop.
+-- Note that an OpenCASCADE curve loop can be made of curves that
+-- share geometrically identical (but topologically different) points.
+-- If `tag' is positive, set the tag explicitly; otherwise a new tag
+-- is selected automatically. Return the tag of the curve loop.
 gmshModelOccAddCurveLoop :: [Int] -> Maybe Int -> IO(Int)
 gmshModelOccAddCurveLoop curveTags tagMaybe = do
    withArrayIntLen curveTags $ \curveTags_n' curveTags' -> do
@@ -3652,6 +4599,12 @@ foreign import ccall safe "gmshc.h gmshModelOccAddCurveLoop"
       -> CInt
       -> Ptr CInt
       -> IO(CInt)
+
+-- Add a rectangle with lower left corner at (`x', `y', `z') and upper
+-- right corner at (`x' + `dx', `y' + `dy', `z'). If `tag' is
+-- positive, set the tag explicitly; otherwise a new tag is selected
+-- automatically. Round the corners if `roundedRadius' is nonzero.
+-- Return the tag of the rectangle.
 gmshModelOccAddRectangle :: Double -> Double -> Double -> Double -> Double -> Maybe Int -> Maybe Double -> IO(Int)
 gmshModelOccAddRectangle x y z dx dy tagMaybe roundedRadiusMaybe = do
    let x' = realToFrac x
@@ -3679,6 +4632,11 @@ foreign import ccall safe "gmshc.h gmshModelOccAddRectangle"
       -> CDouble
       -> Ptr CInt
       -> IO(CInt)
+
+-- Add a disk with center (`xc', `yc', `zc') and radius `rx' along the
+-- x-axis and `ry' along the y-axis. If `tag' is positive, set the tag
+-- explicitly; otherwise a new tag is selected automatically. Return
+-- the tag of the disk.
 gmshModelOccAddDisk :: Double -> Double -> Double -> Double -> Double -> Maybe Int -> IO(Int)
 gmshModelOccAddDisk xc yc zc rx ry tagMaybe = do
    let xc' = realToFrac xc
@@ -3703,6 +4661,12 @@ foreign import ccall safe "gmshc.h gmshModelOccAddDisk"
       -> CInt
       -> Ptr CInt
       -> IO(CInt)
+
+-- Add a plane surface defined by one or more curve loops (or closed
+-- wires) `wireTags'. The first curve loop defines the exterior
+-- contour; additional curve loop define holes. If `tag' is positive,
+-- set the tag explicitly; otherwise a new tag is selected
+-- automatically. Return the tag of the surface.
 gmshModelOccAddPlaneSurface :: [Int] -> Maybe Int -> IO(Int)
 gmshModelOccAddPlaneSurface wireTags tagMaybe = do
    withArrayIntLen wireTags $ \wireTags_n' wireTags' -> do
@@ -3720,6 +4684,11 @@ foreign import ccall safe "gmshc.h gmshModelOccAddPlaneSurface"
       -> CInt
       -> Ptr CInt
       -> IO(CInt)
+
+-- Add a surface filling the curve loops in `wireTags'. If `tag' is
+-- positive, set the tag explicitly; otherwise a new tag is selected
+-- automatically. Return the tag of the surface. If `pointTags' are
+-- provided, force the surface to pass through the given points.
 gmshModelOccAddSurfaceFilling :: Int -> Maybe Int -> Maybe [Int] -> IO(Int)
 gmshModelOccAddSurfaceFilling wireTag tagMaybe pointTagsMaybe = do
    let wireTag' = fromIntegral wireTag
@@ -3740,6 +4709,12 @@ foreign import ccall safe "gmshc.h gmshModelOccAddSurfaceFilling"
       -> CSize
       -> Ptr CInt
       -> IO(CInt)
+
+-- Add a surface loop (a closed shell) formed by `surfaceTags'.  If
+-- `tag' is positive, set the tag explicitly; otherwise a new tag is
+-- selected automatically. Return the tag of the surface loop. Setting
+-- `sewing' allows to build a shell made of surfaces that share
+-- geometrically identical (but topologically different) curves.
 gmshModelOccAddSurfaceLoop :: [Int] -> Maybe Int -> Maybe Bool -> IO(Int)
 gmshModelOccAddSurfaceLoop surfaceTags tagMaybe sewingMaybe = do
    withArrayIntLen surfaceTags $ \surfaceTags_n' surfaceTags' -> do
@@ -3760,6 +4735,12 @@ foreign import ccall safe "gmshc.h gmshModelOccAddSurfaceLoop"
       -> CBool
       -> Ptr CInt
       -> IO(CInt)
+
+-- Add a volume (a region) defined by one or more surface loops
+-- `shellTags'. The first surface loop defines the exterior boundary;
+-- additional surface loop define holes. If `tag' is positive, set the
+-- tag explicitly; otherwise a new tag is selected automatically.
+-- Return the tag of the volume.
 gmshModelOccAddVolume :: [Int] -> Maybe Int -> IO(Int)
 gmshModelOccAddVolume shellTags tagMaybe = do
    withArrayIntLen shellTags $ \shellTags_n' shellTags' -> do
@@ -3777,6 +4758,13 @@ foreign import ccall safe "gmshc.h gmshModelOccAddVolume"
       -> CInt
       -> Ptr CInt
       -> IO(CInt)
+
+-- Add a sphere of center (`xc', `yc', `zc') and radius `r'. The
+-- optional `angle1' and `angle2' arguments define the polar angle
+-- opening (from -Pi/2 to Pi/2). The optional `angle3' argument
+-- defines the azimuthal opening (from 0 to 2*Pi). If `tag' is
+-- positive, set the tag explicitly; otherwise a new tag is selected
+-- automatically. Return the tag of the sphere.
 gmshModelOccAddSphere :: Double -> Double -> Double -> Double -> Maybe Int -> Maybe Double -> Maybe Double -> Maybe Double -> IO(Int)
 gmshModelOccAddSphere xc yc zc radius tagMaybe angle1Maybe angle2Maybe angle3Maybe = do
    let xc' = realToFrac xc
@@ -3808,6 +4796,11 @@ foreign import ccall safe "gmshc.h gmshModelOccAddSphere"
       -> CDouble
       -> Ptr CInt
       -> IO(CInt)
+
+-- Add a parallelepipedic box defined by a point (`x', `y', `z') and
+-- the extents along the x-, y- and z-axes. If `tag' is positive, set
+-- the tag explicitly; otherwise a new tag is selected automatically.
+-- Return the tag of the box.
 gmshModelOccAddBox :: Double -> Double -> Double -> Double -> Double -> Double -> Maybe Int -> IO(Int)
 gmshModelOccAddBox x y z dx dy dz tagMaybe = do
    let x' = realToFrac x
@@ -3834,6 +4827,13 @@ foreign import ccall safe "gmshc.h gmshModelOccAddBox"
       -> CInt
       -> Ptr CInt
       -> IO(CInt)
+
+-- Add a cylinder, defined by the center (`x', `y', `z') of its first
+-- circular face, the 3 components (`dx', `dy', `dz') of the vector
+-- defining its axis and its radius `r'. The optional `angle' argument
+-- defines the angular opening (from 0 to 2*Pi). If `tag' is positive,
+-- set the tag explicitly; otherwise a new tag is selected
+-- automatically. Return the tag of the cylinder.
 gmshModelOccAddCylinder :: Double -> Double -> Double -> Double -> Double -> Double -> Double -> Maybe Int -> Maybe Double -> IO(Int)
 gmshModelOccAddCylinder x y z dx dy dz r tagMaybe angleMaybe = do
    let x' = realToFrac x
@@ -3865,6 +4865,14 @@ foreign import ccall safe "gmshc.h gmshModelOccAddCylinder"
       -> CDouble
       -> Ptr CInt
       -> IO(CInt)
+
+-- Add a cone, defined by the center (`x', `y', `z') of its first
+-- circular face, the 3 components of the vector (`dx', `dy', `dz')
+-- defining its axis and the two radii `r1' and `r2' of the faces
+-- (these radii can be zero). If `tag' is positive, set the tag
+-- explicitly; otherwise a new tag is selected automatically. `angle'
+-- defines the optional angular opening (from 0 to 2*Pi). Return the
+-- tag of the cone.
 gmshModelOccAddCone :: Double -> Double -> Double -> Double -> Double -> Double -> Double -> Double -> Maybe Int -> Maybe Double -> IO(Int)
 gmshModelOccAddCone x y z dx dy dz r1 r2 tagMaybe angleMaybe = do
    let x' = realToFrac x
@@ -3898,6 +4906,13 @@ foreign import ccall safe "gmshc.h gmshModelOccAddCone"
       -> CDouble
       -> Ptr CInt
       -> IO(CInt)
+
+-- Add a right angular wedge, defined by the right-angle point (`x',
+-- `y', `z') and the 3 extends along the x-, y- and z-axes (`dx',
+-- `dy', `dz'). If `tag' is positive, set the tag explicitly;
+-- otherwise a new tag is selected automatically. The optional
+-- argument `ltx' defines the top extent along the x-axis. Return the
+-- tag of the wedge.
 gmshModelOccAddWedge :: Double -> Double -> Double -> Double -> Double -> Double -> Maybe Int -> Maybe Double -> IO(Int)
 gmshModelOccAddWedge x y z dx dy dz tagMaybe ltxMaybe = do
    let x' = realToFrac x
@@ -3927,6 +4942,12 @@ foreign import ccall safe "gmshc.h gmshModelOccAddWedge"
       -> CDouble
       -> Ptr CInt
       -> IO(CInt)
+
+-- Add a torus, defined by its center (`x', `y', `z') and its 2 radii
+-- `r' and `r2'. If `tag' is positive, set the tag explicitly;
+-- otherwise a new tag is selected automatically. The optional
+-- argument `angle' defines the angular opening (from 0 to 2*Pi).
+-- Return the tag of the wedge.
 gmshModelOccAddTorus :: Double -> Double -> Double -> Double -> Double -> Maybe Int -> Maybe Double -> IO(Int)
 gmshModelOccAddTorus x y z r1 r2 tagMaybe angleMaybe = do
    let x' = realToFrac x
@@ -3954,6 +4975,13 @@ foreign import ccall safe "gmshc.h gmshModelOccAddTorus"
       -> CDouble
       -> Ptr CInt
       -> IO(CInt)
+
+-- Add a volume (if the optional argument `makeSolid' is set) or
+-- surfaces defined through the open or closed wires `wireTags'. If
+-- `tag' is positive, set the tag explicitly; otherwise a new tag is
+-- selected automatically. The new entities are returned in
+-- `outDimTags'. If the optional argument `makeRuled' is set, the
+-- surfaces created on the boundary are forced to be ruled surfaces.
 gmshModelOccAddThruSections :: [Int] -> Maybe Int -> Maybe Bool -> Maybe Bool -> IO([(Int,Int)])
 gmshModelOccAddThruSections wireTags tagMaybe makeSolidMaybe makeRuledMaybe = do
    withArrayIntLen wireTags $ \wireTags_n' wireTags' -> do
@@ -3981,6 +5009,13 @@ foreign import ccall safe "gmshc.h gmshModelOccAddThruSections"
       -> CBool
       -> Ptr CInt
       -> IO()
+
+-- Add a hollowed volume built from an initial volume `volumeTag' and
+-- a set of faces from this volume `excludeSurfaceTags', which are to
+-- be removed. The remaining faces of the volume become the walls of
+-- the hollowed solid, with thickness `offset'. If `tag' is positive,
+-- set the tag explicitly; otherwise a new tag is selected
+-- automatically.
 gmshModelOccAddThickSolid :: Int -> [Int] -> Double -> Maybe Int -> IO([(Int,Int)])
 gmshModelOccAddThickSolid volumeTag excludeSurfaceTags offset tagMaybe = do
    let volumeTag' = fromIntegral volumeTag
@@ -4006,6 +5041,13 @@ foreign import ccall safe "gmshc.h gmshModelOccAddThickSolid"
       -> CInt
       -> Ptr CInt
       -> IO()
+
+-- Extrude the model entities `dimTags' by translation along (`dx',
+-- `dy', `dz'). Return extruded entities in `outDimTags'. If
+-- `numElements' is not empty, also extrude the mesh: the entries in
+-- `numElements' give the number of elements in each layer. If
+-- `height' is not empty, it provides the (cumulative) height of the
+-- different layers, normalized to 1.
 gmshModelOccExtrude :: [(Int, Int)] -> Double -> Double -> Double -> Maybe [Int] -> Maybe [Double] -> Maybe Bool -> IO([(Int,Int)])
 gmshModelOccExtrude dimTags dx dy dz numElementsMaybe heightsMaybe recombineMaybe = do
    withArrayPairLen dimTags $ \dimTags_n' dimTags' -> do
@@ -4041,6 +5083,15 @@ foreign import ccall safe "gmshc.h gmshModelOccExtrude"
       -> CBool
       -> Ptr CInt
       -> IO()
+
+-- Extrude the model entities `dimTags' by rotation of `angle' radians
+-- around the axis of revolution defined by the point (`x', `y', `z')
+-- and the direction (`ax', `ay', `az'). Return extruded entities in
+-- `outDimTags'. If `numElements' is not empty, also extrude the mesh:
+-- the entries in `numElements' give the number of elements in each
+-- layer. If `height' is not empty, it provides the (cumulative)
+-- height of the different layers, normalized to 1. When the mesh is
+-- extruded the angle should be strictly smaller than 2*Pi.
 gmshModelOccRevolve :: [(Int, Int)] -> Double -> Double -> Double -> Double -> Double -> Double -> Double -> Maybe [Int] -> Maybe [Double] -> Maybe Bool -> IO([(Int,Int)])
 gmshModelOccRevolve dimTags x y z ax ay az angle numElementsMaybe heightsMaybe recombineMaybe = do
    withArrayPairLen dimTags $ \dimTags_n' dimTags' -> do
@@ -4084,6 +5135,9 @@ foreign import ccall safe "gmshc.h gmshModelOccRevolve"
       -> CBool
       -> Ptr CInt
       -> IO()
+
+-- Add a pipe by extruding the entities `dimTags' along the wire
+-- `wireTag'. Return the pipe in `outDimTags'.
 gmshModelOccAddPipe :: [(Int, Int)] -> Int -> IO([(Int,Int)])
 gmshModelOccAddPipe dimTags wireTag = do
    withArrayPairLen dimTags $ \dimTags_n' dimTags' -> do
@@ -4104,6 +5158,14 @@ foreign import ccall safe "gmshc.h gmshModelOccAddPipe"
       -> Ptr CSize
       -> Ptr CInt
       -> IO()
+
+-- Fillet the volumes `volumeTags' on the curves `curveTags' with
+-- radii `radii'. The `radii' vector can either contain a single
+-- radius, as many radii as `curveTags', or twice as many as
+-- `curveTags' (in which case different radii are provided for the
+-- begin and end points of the curves). Return the filleted entities
+-- in `outDimTags'. Remove the original volume if `removeVolume' is
+-- set.
 gmshModelOccFillet :: [Int] -> [Int] -> [Double] -> Maybe Bool -> IO([(Int,Int)])
 gmshModelOccFillet volumeTags curveTags radii removeVolumeMaybe = do
    withArrayIntLen volumeTags $ \volumeTags_n' volumeTags' -> do
@@ -4131,6 +5193,16 @@ foreign import ccall safe "gmshc.h gmshModelOccFillet"
       -> CBool
       -> Ptr CInt
       -> IO()
+
+-- Chamfer the volumes `volumeTags' on the curves `curveTags' with
+-- distances `distances' measured on surfaces `surfaceTags'. The
+-- `distances' vector can either contain a single distance, as many
+-- distances as `curveTags' and `surfaceTags', or twice as many as
+-- `curveTags' and `surfaceTags' (in which case the first in each pair
+-- is measured on the corresponding surface in `surfaceTags', the
+-- other on the other adjacent surface). Return the chamfered entities
+-- in `outDimTags'. Remove the original volume if `removeVolume' is
+-- set.
 gmshModelOccChamfer :: [Int] -> [Int] -> [Int] -> [Double] -> Maybe Bool -> IO([(Int,Int)])
 gmshModelOccChamfer volumeTags curveTags surfaceTags distances removeVolumeMaybe = do
    withArrayIntLen volumeTags $ \volumeTags_n' volumeTags' -> do
@@ -4161,6 +5233,13 @@ foreign import ccall safe "gmshc.h gmshModelOccChamfer"
       -> CBool
       -> Ptr CInt
       -> IO()
+
+-- Compute the boolean union (the fusion) of the entities
+-- `objectDimTags' and `toolDimTags'. Return the resulting entities in
+-- `outDimTags'. If `tag' is positive, try to set the tag explicitly
+-- (only valid if the boolean operation results in a single entity).
+-- Remove the object if `removeObject' is set. Remove the tool if
+-- `removeTool' is set.
 gmshModelOccFuse :: [(Int, Int)] -> [(Int, Int)] -> Maybe Int -> Maybe Bool -> Maybe Bool -> IO([(Int,Int)], [[(Int, Int)]])
 gmshModelOccFuse objectDimTags toolDimTags tagMaybe removeObjectMaybe removeToolMaybe = do
    withArrayPairLen objectDimTags $ \objectDimTags_n' objectDimTags' -> do
@@ -4198,6 +5277,13 @@ foreign import ccall safe "gmshc.h gmshModelOccFuse"
       -> CBool
       -> Ptr CInt
       -> IO()
+
+-- Compute the boolean intersection (the common parts) of the entities
+-- `objectDimTags' and `toolDimTags'. Return the resulting entities in
+-- `outDimTags'. If `tag' is positive, try to set the tag explicitly
+-- (only valid if the boolean operation results in a single entity).
+-- Remove the object if `removeObject' is set. Remove the tool if
+-- `removeTool' is set.
 gmshModelOccIntersect :: [(Int, Int)] -> [(Int, Int)] -> Maybe Int -> Maybe Bool -> Maybe Bool -> IO([(Int,Int)], [[(Int, Int)]])
 gmshModelOccIntersect objectDimTags toolDimTags tagMaybe removeObjectMaybe removeToolMaybe = do
    withArrayPairLen objectDimTags $ \objectDimTags_n' objectDimTags' -> do
@@ -4235,6 +5321,13 @@ foreign import ccall safe "gmshc.h gmshModelOccIntersect"
       -> CBool
       -> Ptr CInt
       -> IO()
+
+-- Compute the boolean difference between the entities `objectDimTags'
+-- and `toolDimTags'. Return the resulting entities in `outDimTags'.
+-- If `tag' is positive, try to set the tag explicitly (only valid if
+-- the boolean operation results in a single entity). Remove the
+-- object if `removeObject' is set. Remove the tool if `removeTool' is
+-- set.
 gmshModelOccCut :: [(Int, Int)] -> [(Int, Int)] -> Maybe Int -> Maybe Bool -> Maybe Bool -> IO([(Int,Int)], [[(Int, Int)]])
 gmshModelOccCut objectDimTags toolDimTags tagMaybe removeObjectMaybe removeToolMaybe = do
    withArrayPairLen objectDimTags $ \objectDimTags_n' objectDimTags' -> do
@@ -4272,6 +5365,13 @@ foreign import ccall safe "gmshc.h gmshModelOccCut"
       -> CBool
       -> Ptr CInt
       -> IO()
+
+-- Compute the boolean fragments (general fuse) of the entities
+-- `objectDimTags' and `toolDimTags'. Return the resulting entities in
+-- `outDimTags'. If `tag' is positive, try to set the tag explicitly
+-- (only valid if the boolean operation results in a single entity).
+-- Remove the object if `removeObject' is set. Remove the tool if
+-- `removeTool' is set.
 gmshModelOccFragment :: [(Int, Int)] -> [(Int, Int)] -> Maybe Int -> Maybe Bool -> Maybe Bool -> IO([(Int,Int)], [[(Int, Int)]])
 gmshModelOccFragment objectDimTags toolDimTags tagMaybe removeObjectMaybe removeToolMaybe = do
    withArrayPairLen objectDimTags $ \objectDimTags_n' objectDimTags' -> do
@@ -4309,6 +5409,8 @@ foreign import ccall safe "gmshc.h gmshModelOccFragment"
       -> CBool
       -> Ptr CInt
       -> IO()
+
+-- Translate the model entities `dimTags' along (`dx', `dy', `dz').
 gmshModelOccTranslate :: [(Int, Int)] -> Double -> Double -> Double -> IO()
 gmshModelOccTranslate dimTags dx dy dz = do
    withArrayPairLen dimTags $ \dimTags_n' dimTags' -> do
@@ -4328,6 +5430,10 @@ foreign import ccall safe "gmshc.h gmshModelOccTranslate"
       -> CDouble
       -> Ptr CInt
       -> IO()
+
+-- Rotate the model entities `dimTags' of `angle' radians around the
+-- axis of revolution defined by the point (`x', `y', `z') and the
+-- direction (`ax', `ay', `az').
 gmshModelOccRotate :: [(Int, Int)] -> Double -> Double -> Double -> Double -> Double -> Double -> Double -> IO()
 gmshModelOccRotate dimTags x y z ax ay az angle = do
    withArrayPairLen dimTags $ \dimTags_n' dimTags' -> do
@@ -4355,6 +5461,10 @@ foreign import ccall safe "gmshc.h gmshModelOccRotate"
       -> CDouble
       -> Ptr CInt
       -> IO()
+
+-- Scale the model entities `dimTag' by factors `a', `b' and `c' along
+-- the three coordinate axes; use (`x', `y', `z') as the center of the
+-- homothetic transformation.
 gmshModelOccDilate :: [(Int, Int)] -> Double -> Double -> Double -> Double -> Double -> Double -> IO()
 gmshModelOccDilate dimTags x y z a b c = do
    withArrayPairLen dimTags $ \dimTags_n' dimTags' -> do
@@ -4380,6 +5490,10 @@ foreign import ccall safe "gmshc.h gmshModelOccDilate"
       -> CDouble
       -> Ptr CInt
       -> IO()
+
+-- Apply a symmetry transformation to the model entities `dimTag',
+-- with respect to the plane of equation `a' * x + `b' * y + `c' * z +
+-- `d' = 0.
 gmshModelOccMirror :: [(Int, Int)] -> Double -> Double -> Double -> Double -> IO()
 gmshModelOccMirror dimTags a b c d = do
    withArrayPairLen dimTags $ \dimTags_n' dimTags' -> do
@@ -4401,6 +5515,11 @@ foreign import ccall safe "gmshc.h gmshModelOccMirror"
       -> CDouble
       -> Ptr CInt
       -> IO()
+
+-- Apply a symmetry transformation to the model entities `dimTag',
+-- with respect to the plane of equation `a' * x + `b' * y + `c' * z +
+-- `d' = 0. (This is a synonym for `mirror', which will be deprecated
+-- in a future release.)
 gmshModelOccSymmetrize :: [(Int, Int)] -> Double -> Double -> Double -> Double -> IO()
 gmshModelOccSymmetrize dimTags a b c d = do
    withArrayPairLen dimTags $ \dimTags_n' dimTags' -> do
@@ -4422,6 +5541,10 @@ foreign import ccall safe "gmshc.h gmshModelOccSymmetrize"
       -> CDouble
       -> Ptr CInt
       -> IO()
+
+-- Apply a general affine transformation matrix `a' (16 entries of a
+-- 4x4 matrix, by row; only the 12 first can be provided for
+-- convenience) to the model entities `dimTag'.
 gmshModelOccAffineTransform :: [(Int, Int)] -> [Double] -> IO()
 gmshModelOccAffineTransform dimTags a = do
    withArrayPairLen dimTags $ \dimTags_n' dimTags' -> do
@@ -4438,6 +5561,9 @@ foreign import ccall safe "gmshc.h gmshModelOccAffineTransform"
       -> CSize
       -> Ptr CInt
       -> IO()
+
+-- Copy the entities `dimTags'; the new entities are returned in
+-- `outDimTags'.
 gmshModelOccCopy :: [(Int, Int)] -> IO([(Int,Int)])
 gmshModelOccCopy dimTags = do
    withArrayPairLen dimTags $ \dimTags_n' dimTags' -> do
@@ -4456,6 +5582,9 @@ foreign import ccall safe "gmshc.h gmshModelOccCopy"
       -> Ptr CSize
       -> Ptr CInt
       -> IO()
+
+-- Remove the entities `dimTags'. If `recursive' is true, remove all
+-- the entities on their boundaries, down to dimension 0.
 gmshModelOccRemove :: [(Int, Int)] -> Maybe Bool -> IO()
 gmshModelOccRemove dimTags recursiveMaybe = do
    withArrayPairLen dimTags $ \dimTags_n' dimTags' -> do
@@ -4472,6 +5601,10 @@ foreign import ccall safe "gmshc.h gmshModelOccRemove"
       -> CBool
       -> Ptr CInt
       -> IO()
+
+-- Remove all duplicate entities (different entities at the same
+-- geometrical location) after intersecting (using boolean fragments)
+-- all highest dimensional entities.
 gmshModelOccRemoveAllDuplicates :: IO()
 gmshModelOccRemoveAllDuplicates = do
    alloca $ \errptr -> do
@@ -4482,6 +5615,11 @@ foreign import ccall safe "gmshc.h gmshModelOccRemoveAllDuplicates"
    cgmshModelOccRemoveAllDuplicates
       :: Ptr CInt
       -> IO()
+
+-- Apply various healing procedures to the entities `dimTags' (or to
+-- all the entities in the model if `dimTags' is empty). Return the
+-- healed entities in `outDimTags'. Available healing options are
+-- listed in the Gmsh reference manual.
 gmshModelOccHealShapes :: Maybe [(Int, Int)] -> Maybe Double -> Maybe Bool -> Maybe Bool -> Maybe Bool -> Maybe Bool -> Maybe Bool -> IO([(Int,Int)])
 gmshModelOccHealShapes dimTagsMaybe toleranceMaybe fixDegeneratedMaybe fixSmallEdgesMaybe fixSmallFacesMaybe sewFacesMaybe makeSolidsMaybe = do
    let dimTags = fromMaybe ([]) dimTagsMaybe
@@ -4519,6 +5657,13 @@ foreign import ccall safe "gmshc.h gmshModelOccHealShapes"
       -> CBool
       -> Ptr CInt
       -> IO()
+
+-- Import BREP, STEP or IGES shapes from the file `fileName'. The
+-- imported entities are returned in `outDimTags'. If the optional
+-- argument `highestDimOnly' is set, only import the highest
+-- dimensional entities in the file. The optional argument `format'
+-- can be used to force the format of the file (currently "brep",
+-- "step" or "iges").
 gmshModelOccImportShapes :: String -> Maybe Bool -> Maybe String -> IO([(Int,Int)])
 gmshModelOccImportShapes fileName highestDimOnlyMaybe formatMaybe = do
    withCString fileName $ \fileName' -> do
@@ -4542,6 +5687,9 @@ foreign import ccall safe "gmshc.h gmshModelOccImportShapes"
       -> CString
       -> Ptr CInt
       -> IO()
+
+-- Set a mesh size constraint on the model entities `dimTags'.
+-- Currently only entities of dimension 0 (points) are handled.
 gmshModelOccSetMeshSize :: [(Int, Int)] -> Double -> IO()
 gmshModelOccSetMeshSize dimTags size = do
    withArrayPairLen dimTags $ \dimTags_n' dimTags' -> do
@@ -4557,6 +5705,8 @@ foreign import ccall safe "gmshc.h gmshModelOccSetMeshSize"
       -> CDouble
       -> Ptr CInt
       -> IO()
+
+-- Get the mass of the model entity of dimension `dim' and tag `tag'.
 gmshModelOccGetMass :: Int -> Int -> IO(Double)
 gmshModelOccGetMass dim tag = do
    let dim' = fromIntegral dim
@@ -4575,6 +5725,9 @@ foreign import ccall safe "gmshc.h gmshModelOccGetMass"
       -> Ptr CDouble
       -> Ptr CInt
       -> IO()
+
+-- Get the center of mass of the model entity of dimension `dim' and
+-- tag `tag'.
 gmshModelOccGetCenterOfMass :: Int -> Int -> IO(Double, Double, Double)
 gmshModelOccGetCenterOfMass dim tag = do
    let dim' = fromIntegral dim
@@ -4601,6 +5754,9 @@ foreign import ccall safe "gmshc.h gmshModelOccGetCenterOfMass"
       -> Ptr CDouble
       -> Ptr CInt
       -> IO()
+
+-- Get the matrix of inertia (by row) of the model entity of dimension
+-- `dim' and tag `tag'.
 gmshModelOccGetMatrixOfInertia :: Int -> Int -> IO([Double])
 gmshModelOccGetMatrixOfInertia dim tag = do
    let dim' = fromIntegral dim
@@ -4620,6 +5776,11 @@ foreign import ccall safe "gmshc.h gmshModelOccGetMatrixOfInertia"
       -> Ptr CSize
       -> Ptr CInt
       -> IO()
+
+-- Synchronize the OpenCASCADE CAD representation with the current
+-- Gmsh model. This can be called at any time, but since it involves a
+-- non trivial amount of processing, the number of synchronization
+-- points should normally be minimized.
 gmshModelOccSynchronize :: IO()
 gmshModelOccSynchronize = do
    alloca $ \errptr -> do
@@ -4630,6 +5791,15 @@ foreign import ccall safe "gmshc.h gmshModelOccSynchronize"
    cgmshModelOccSynchronize
       :: Ptr CInt
       -> IO()
+
+
+---------------------------------
+-- post-processing view functions
+---------------------------------
+
+-- Add a new post-processing view, with name `name'. If `tag' is
+-- positive use it (and remove the view with that tag if it already
+-- exists), otherwise associate a new tag. Return the view tag.
 gmshViewAdd :: String -> Maybe Int -> IO(Int)
 gmshViewAdd name tagMaybe = do
    withCString name $ \name' -> do
@@ -4646,6 +5816,8 @@ foreign import ccall safe "gmshc.h gmshViewAdd"
       -> CInt
       -> Ptr CInt
       -> IO(CInt)
+
+-- Remove the view with tag `tag'.
 gmshViewRemove :: Int -> IO()
 gmshViewRemove tag = do
    let tag' = fromIntegral tag
@@ -4658,6 +5830,10 @@ foreign import ccall safe "gmshc.h gmshViewRemove"
       :: CInt
       -> Ptr CInt
       -> IO()
+
+-- Get the index of the view with tag `tag' in the list of currently
+-- loaded views. This dynamic index (it can change when views are
+-- removed) is used to access view options.
 gmshViewGetIndex :: Int -> IO(Int)
 gmshViewGetIndex tag = do
    let tag' = fromIntegral tag
@@ -4671,6 +5847,8 @@ foreign import ccall safe "gmshc.h gmshViewGetIndex"
       :: CInt
       -> Ptr CInt
       -> IO(CInt)
+
+-- Get the tags of all views.
 gmshViewGetTags :: IO([Int])
 gmshViewGetTags = do
    alloca $ \tags' -> do
@@ -4686,6 +5864,21 @@ foreign import ccall safe "gmshc.h gmshViewGetTags"
       -> Ptr CSize
       -> Ptr CInt
       -> IO()
+
+-- Add model-based post-processing data to the view with tag `tag'.
+-- `modelName' identifies the model the data is attached to.
+-- `dataType' specifies the type of data, currently either "NodeData",
+-- "ElementData" or "ElementNodeData". `step' specifies the identifier
+-- (>= 0) of the data in a sequence. `tags' gives the tags of the
+-- nodes or elements in the mesh to which the data is associated.
+-- `data' is a vector of the same length as `tags': each entry is the
+-- vector of double precision numbers representing the data associated
+-- with the corresponding tag. The optional `time' argument associate
+-- a time value with the data. `numComponents' gives the number of
+-- data components (1 for scalar data, 3 for vector data, etc.) per
+-- entity; if negative, it is automatically inferred (when possible)
+-- from the input data. `partition' allows to specify data in several
+-- sub-sets.
 gmshViewAddModelData :: Int -> Int -> String -> String -> [Int] -> [[Double]] -> Maybe Double -> Maybe Int -> Maybe Int -> IO()
 gmshViewAddModelData tag step modelName dataType tags daatta timeMaybe numComponentsMaybe partitionMaybe = do
    let tag' = fromIntegral tag
@@ -4720,6 +5913,11 @@ foreign import ccall safe "gmshc.h gmshViewAddModelData"
       -> CInt
       -> Ptr CInt
       -> IO()
+
+-- Get model-based post-processing data from the view with tag `tag'
+-- at step `step'. Return the `data' associated to the nodes or the
+-- elements with tags `tags', as well as the `dataType' and the number
+-- of components `numComponents'.
 gmshViewGetModelData :: Int -> Int -> IO(String, [Int], [[Double]], Double, Int)
 gmshViewGetModelData tag step = do
    let tag' = fromIntegral tag
@@ -4758,6 +5956,11 @@ foreign import ccall safe "gmshc.h gmshViewGetModelData"
       -> Ptr CInt
       -> Ptr CInt
       -> IO()
+
+-- Add list-based post-processing data to the view with tag `tag'.
+-- `dataType' identifies the data: "SP" for scalar points, "VP", for
+-- vector points, etc. `numEle' gives the number of elements in the
+-- data. `data' contains the data for the `numEle' elements.
 gmshViewAddListData :: Int -> String -> Int -> [Double] -> IO()
 gmshViewAddListData tag dataType numEle daatta = do
    let tag' = fromIntegral tag
@@ -4777,6 +5980,10 @@ foreign import ccall safe "gmshc.h gmshViewAddListData"
       -> CSize
       -> Ptr CInt
       -> IO()
+
+-- Get list-based post-processing data from the view with tag `tag'.
+-- Return the types `dataTypes', the number of elements `numElements'
+-- for each data type and the `data' for each data type.
 gmshViewGetListData :: Int -> IO([String], [Int], [[Double]])
 gmshViewGetListData tag = do
    let tag' = fromIntegral tag
@@ -4806,6 +6013,13 @@ foreign import ccall safe "gmshc.h gmshViewGetListData"
       -> Ptr CSize
       -> Ptr CInt
       -> IO()
+
+-- Add a string to a list-based post-processing view with tag `tag'.
+-- If `coord' contains 3 coordinates the string is positioned in the
+-- 3D model space ("3D string"); if it contains 2 coordinates it is
+-- positioned in the 2D graphics viewport ("2D string"). `data'
+-- contains one or more (for multistep views) strings. `style'
+-- contains pairs of styling parameters, concatenated.
 gmshViewAddListDataString :: Int -> [Double] -> [String] -> Maybe [String] -> IO()
 gmshViewAddListDataString tag coord daatta styleMaybe = do
    let tag' = fromIntegral tag
@@ -4828,6 +6042,11 @@ foreign import ccall safe "gmshc.h gmshViewAddListDataString"
       -> CSize
       -> Ptr CInt
       -> IO()
+
+-- Get list-based post-processing data strings (2D strings if `dim' =
+-- 2, 3D strings if `dim' = 3) from the view with tag `tag'. Return
+-- the coordinates in `coord', the strings in `data' and the styles in
+-- `style'.
 gmshViewGetListDataStrings :: Int -> Int -> IO([Double], [String], [String])
 gmshViewGetListDataStrings tag dim = do
    let tag' = fromIntegral tag
@@ -4857,6 +6076,12 @@ foreign import ccall safe "gmshc.h gmshViewGetListDataStrings"
       -> Ptr CSize
       -> Ptr CInt
       -> IO()
+
+-- Add a post-processing view as an `alias' of the reference view with
+-- tag `refTag'. If `copyOptions' is set, copy the options of the
+-- reference view. If `tag' is positive use it (and remove the view
+-- with that tag if it already exists), otherwise associate a new tag.
+-- Return the view tag.
 gmshViewAddAlias :: Int -> Maybe Bool -> Maybe Int -> IO(Int)
 gmshViewAddAlias refTag copyOptionsMaybe tagMaybe = do
    let refTag' = fromIntegral refTag
@@ -4876,6 +6101,9 @@ foreign import ccall safe "gmshc.h gmshViewAddAlias"
       -> CInt
       -> Ptr CInt
       -> IO(CInt)
+
+-- Copy the options from the view with tag `refTag' to the view with
+-- tag `tag'.
 gmshViewCopyOptions :: Int -> Int -> IO()
 gmshViewCopyOptions refTag tag = do
    let refTag' = fromIntegral refTag
@@ -4890,6 +6118,11 @@ foreign import ccall safe "gmshc.h gmshViewCopyOptions"
       -> CInt
       -> Ptr CInt
       -> IO()
+
+-- Combine elements (if `what' == "elements") or steps (if `what' ==
+-- "steps") of all views (`how' == "all"), all visible views (`how' ==
+-- "visible") or all views having the same name (`how' == "name").
+-- Remove original views if `remove' is set.
 gmshViewCombine :: String -> String -> Maybe Bool -> Maybe Bool -> IO()
 gmshViewCombine what how removeMaybe copyOptionsMaybe = do
    withCString what $ \what' -> do
@@ -4910,6 +6143,15 @@ foreign import ccall safe "gmshc.h gmshViewCombine"
       -> CBool
       -> Ptr CInt
       -> IO()
+
+-- Probe the view `tag' for its `value' at point (`x', `y', `z').
+-- Return only the value at step `step' is `step' is positive. Return
+-- only values with `numComp' if `numComp' is positive. Return the
+-- gradient of the `value' if `gradient' is set. Probes with a
+-- geometrical tolerance (in the reference unit cube) of `tolerance'
+-- if `tolerance' is not zero. Return the result from the element
+-- described by its coordinates if `xElementCoord', `yElementCoord'
+-- and `zElementCoord' are provided.
 gmshViewProbe :: Int -> Double -> Double -> Double -> Maybe Int -> Maybe Int -> Maybe Bool -> Maybe Double -> Maybe [Double] -> Maybe [Double] -> Maybe [Double] -> IO([Double])
 gmshViewProbe tag x y z stepMaybe numCompMaybe gradientMaybe toleranceMaybe xElemCoordMaybe yElemCoordMaybe zElemCoordMaybe = do
    let tag' = fromIntegral tag
@@ -4957,6 +6199,10 @@ foreign import ccall safe "gmshc.h gmshViewProbe"
       -> CSize
       -> Ptr CInt
       -> IO()
+
+-- Write the view to a file `fileName'. The export format is
+-- determined by the file extension. Append to the file if `append' is
+-- set.
 gmshViewWrite :: Int -> String -> Maybe Bool -> IO()
 gmshViewWrite tag fileName appendMaybe = do
    let tag' = fromIntegral tag
@@ -4974,6 +6220,14 @@ foreign import ccall safe "gmshc.h gmshViewWrite"
       -> CBool
       -> Ptr CInt
       -> IO()
+
+
+-------------------
+-- plugin functions
+-------------------
+
+-- Set the numerical option `option' to the value `value' for plugin
+-- `name'.
 gmshPluginSetNumber :: String -> String -> Double -> IO()
 gmshPluginSetNumber name option value = do
    withCString name $ \name' -> do
@@ -4990,6 +6244,9 @@ foreign import ccall safe "gmshc.h gmshPluginSetNumber"
       -> CDouble
       -> Ptr CInt
       -> IO()
+
+-- Set the string option `option' to the value `value' for plugin
+-- `name'.
 gmshPluginSetString :: String -> String -> String -> IO()
 gmshPluginSetString name option value = do
    withCString name $ \name' -> do
@@ -5006,6 +6263,8 @@ foreign import ccall safe "gmshc.h gmshPluginSetString"
       -> CString
       -> Ptr CInt
       -> IO()
+
+-- Run the plugin `name'.
 gmshPluginRun :: String -> IO()
 gmshPluginRun name = do
    withCString name $ \name' -> do
@@ -5018,6 +6277,13 @@ foreign import ccall safe "gmshc.h gmshPluginRun"
       :: CString
       -> Ptr CInt
       -> IO()
+
+
+---------------------
+-- graphics functions
+---------------------
+
+-- Draw all the OpenGL scenes.
 gmshGraphicsDraw :: IO()
 gmshGraphicsDraw = do
    alloca $ \errptr -> do
@@ -5028,6 +6294,14 @@ foreign import ccall safe "gmshc.h gmshGraphicsDraw"
    cgmshGraphicsDraw
       :: Ptr CInt
       -> IO()
+
+
+------------------------------------------
+-- FLTK graphical user interface functions
+------------------------------------------
+
+-- Create the FLTK graphical user interface. Can only be called in the
+-- main thread.
 gmshFltkInitialize :: IO()
 gmshFltkInitialize = do
    alloca $ \errptr -> do
@@ -5038,6 +6312,11 @@ foreign import ccall safe "gmshc.h gmshFltkInitialize"
    cgmshFltkInitialize
       :: Ptr CInt
       -> IO()
+
+-- Wait at most `time' seconds for user interface events and return.
+-- If `time' < 0, wait indefinitely. First automatically create the
+-- user interface if it has not yet been initialized. Can only be
+-- called in the main thread.
 gmshFltkWait :: Maybe Double -> IO()
 gmshFltkWait timeMaybe = do
    let time = fromMaybe (-1.0) timeMaybe
@@ -5051,6 +6330,12 @@ foreign import ccall safe "gmshc.h gmshFltkWait"
       :: CDouble
       -> Ptr CInt
       -> IO()
+
+-- Update the user interface (potentially creating new widgets and
+-- windows). First automatically create the user interface if it has
+-- not yet been initialized. Can only be called in the main thread:
+-- use `awake("update")' to trigger an update of the user interface
+-- from another thread.
 gmshFltkUpdate :: IO()
 gmshFltkUpdate = do
    alloca $ \errptr -> do
@@ -5061,6 +6346,10 @@ foreign import ccall safe "gmshc.h gmshFltkUpdate"
    cgmshFltkUpdate
       :: Ptr CInt
       -> IO()
+
+-- Awake the main user interface thread and process pending events,
+-- and optionally perform an action (currently the only `action'
+-- allowed is "update").
 gmshFltkAwake :: Maybe String -> IO()
 gmshFltkAwake actionMaybe = do
    let action = fromMaybe ("") actionMaybe
@@ -5074,6 +6363,9 @@ foreign import ccall safe "gmshc.h gmshFltkAwake"
       :: CString
       -> Ptr CInt
       -> IO()
+
+-- Block the current thread until it can safely modify the user
+-- interface.
 gmshFltkLock :: IO()
 gmshFltkLock = do
    alloca $ \errptr -> do
@@ -5084,6 +6376,8 @@ foreign import ccall safe "gmshc.h gmshFltkLock"
    cgmshFltkLock
       :: Ptr CInt
       -> IO()
+
+-- Release the lock that was set using lock.
 gmshFltkUnlock :: IO()
 gmshFltkUnlock = do
    alloca $ \errptr -> do
@@ -5094,6 +6388,11 @@ foreign import ccall safe "gmshc.h gmshFltkUnlock"
    cgmshFltkUnlock
       :: Ptr CInt
       -> IO()
+
+-- Run the event loop of the graphical user interface, i.e. repeatedly
+-- call `wait()'. First automatically create the user interface if it
+-- has not yet been initialized. Can only be called in the main
+-- thread.
 gmshFltkRun :: IO()
 gmshFltkRun = do
    alloca $ \errptr -> do
@@ -5104,6 +6403,9 @@ foreign import ccall safe "gmshc.h gmshFltkRun"
    cgmshFltkRun
       :: Ptr CInt
       -> IO()
+
+-- Check if the user interface is available (e.g. to detect if it has
+-- been closed).
 gmshFltkIsAvailable :: IO(Int)
 gmshFltkIsAvailable = do
    alloca $ \errptr -> do
@@ -5115,6 +6417,10 @@ foreign import ccall safe "gmshc.h gmshFltkIsAvailable"
    cgmshFltkIsAvailable
       :: Ptr CInt
       -> IO(CInt)
+
+-- Select entities in the user interface. If `dim' is >= 0, return
+-- only the entities of the specified dimension (e.g. points if `dim'
+-- == 0).
 gmshFltkSelectEntities :: Maybe Int -> IO(Int, [(Int,Int)])
 gmshFltkSelectEntities dimMaybe = do
    let dim = fromMaybe (-1) dimMaybe
@@ -5134,6 +6440,8 @@ foreign import ccall safe "gmshc.h gmshFltkSelectEntities"
       -> CInt
       -> Ptr CInt
       -> IO(CInt)
+
+-- Select elements in the user interface.
 gmshFltkSelectElements :: IO(Int, [Int])
 gmshFltkSelectElements = do
    alloca $ \elementTags' -> do
@@ -5150,6 +6458,8 @@ foreign import ccall safe "gmshc.h gmshFltkSelectElements"
       -> Ptr CSize
       -> Ptr CInt
       -> IO(CInt)
+
+-- Select views in the user interface.
 gmshFltkSelectViews :: IO(Int, [Int])
 gmshFltkSelectViews = do
    alloca $ \viewTags' -> do
@@ -5166,6 +6476,14 @@ foreign import ccall safe "gmshc.h gmshFltkSelectViews"
       -> Ptr CSize
       -> Ptr CInt
       -> IO(CInt)
+
+
+--------------------------
+-- ONELAB server functions
+--------------------------
+
+-- Set one or more parameters in the ONELAB database, encoded in
+-- `format'.
 gmshOnelabSet :: String -> Maybe String -> IO()
 gmshOnelabSet daatta formatMaybe = do
    withCString daatta $ \daatta' -> do
@@ -5181,6 +6499,9 @@ foreign import ccall safe "gmshc.h gmshOnelabSet"
       -> CString
       -> Ptr CInt
       -> IO()
+
+-- Get all the parameters (or a single one if `name' is specified)
+-- from the ONELAB database, encoded in `format'.
 gmshOnelabGet :: Maybe String -> Maybe String -> IO(String)
 gmshOnelabGet nameMaybe formatMaybe = do
    let name = fromMaybe ("") nameMaybe
@@ -5201,6 +6522,10 @@ foreign import ccall safe "gmshc.h gmshOnelabGet"
       -> CString
       -> Ptr CInt
       -> IO()
+
+-- Set the value of the number parameter `name' in the ONELAB
+-- database. Create the parameter if it does not exist; update the
+-- value if the parameter exists.
 gmshOnelabSetNumber :: String -> [Double] -> IO()
 gmshOnelabSetNumber name value = do
    withCString name $ \name' -> do
@@ -5216,6 +6541,10 @@ foreign import ccall safe "gmshc.h gmshOnelabSetNumber"
       -> CSize
       -> Ptr CInt
       -> IO()
+
+-- Set the value of the string parameter `name' in the ONELAB
+-- database. Create the parameter if it does not exist; update the
+-- value if the parameter exists.
 gmshOnelabSetString :: String -> [String] -> IO()
 gmshOnelabSetString name value = do
    withCString name $ \name' -> do
@@ -5231,6 +6560,9 @@ foreign import ccall safe "gmshc.h gmshOnelabSetString"
       -> CSize
       -> Ptr CInt
       -> IO()
+
+-- Get the value of the number parameter `name' from the ONELAB
+-- database. Return an empty vector if the parameter does not exist.
 gmshOnelabGetNumber :: String -> IO([Double])
 gmshOnelabGetNumber name = do
    withCString name $ \name' -> do
@@ -5248,6 +6580,9 @@ foreign import ccall safe "gmshc.h gmshOnelabGetNumber"
       -> Ptr CSize
       -> Ptr CInt
       -> IO()
+
+-- Get the value of the string parameter `name' from the ONELAB
+-- database. Return an empty vector if the parameter does not exist.
 gmshOnelabGetString :: String -> IO([String])
 gmshOnelabGetString name = do
    withCString name $ \name' -> do
@@ -5265,6 +6600,9 @@ foreign import ccall safe "gmshc.h gmshOnelabGetString"
       -> Ptr CSize
       -> Ptr CInt
       -> IO()
+
+-- Clear the ONELAB database, or remove a single parameter if `name'
+-- is given.
 gmshOnelabClear :: Maybe String -> IO()
 gmshOnelabClear nameMaybe = do
    let name = fromMaybe ("") nameMaybe
@@ -5278,6 +6616,10 @@ foreign import ccall safe "gmshc.h gmshOnelabClear"
       :: CString
       -> Ptr CInt
       -> IO()
+
+-- Run a ONELAB client. If `name' is provided, create a new ONELAB
+-- client with name `name' and executes `command'. If not, try to run
+-- a client that might be linked to the processed input files.
 gmshOnelabRun :: Maybe String -> Maybe String -> IO()
 gmshOnelabRun nameMaybe commandMaybe = do
    let name = fromMaybe ("") nameMaybe
@@ -5294,6 +6636,13 @@ foreign import ccall safe "gmshc.h gmshOnelabRun"
       -> CString
       -> Ptr CInt
       -> IO()
+
+
+--------------------------------
+-- information logging functions
+--------------------------------
+
+-- Write a `message'. `level' can be "info", "warning" or "error".
 gmshLoggerWrite :: String -> Maybe String -> IO()
 gmshLoggerWrite message levelMaybe = do
    withCString message $ \message' -> do
@@ -5309,6 +6658,8 @@ foreign import ccall safe "gmshc.h gmshLoggerWrite"
       -> CString
       -> Ptr CInt
       -> IO()
+
+-- Start logging messages.
 gmshLoggerStart :: IO()
 gmshLoggerStart = do
    alloca $ \errptr -> do
@@ -5319,6 +6670,8 @@ foreign import ccall safe "gmshc.h gmshLoggerStart"
    cgmshLoggerStart
       :: Ptr CInt
       -> IO()
+
+-- Get logged messages.
 gmshLoggerGet :: IO([String])
 gmshLoggerGet = do
    alloca $ \log' -> do
@@ -5334,6 +6687,8 @@ foreign import ccall safe "gmshc.h gmshLoggerGet"
       -> Ptr CSize
       -> Ptr CInt
       -> IO()
+
+-- Stop logging messages.
 gmshLoggerStop :: IO()
 gmshLoggerStop = do
    alloca $ \errptr -> do
@@ -5344,6 +6699,8 @@ foreign import ccall safe "gmshc.h gmshLoggerStop"
    cgmshLoggerStop
       :: Ptr CInt
       -> IO()
+
+-- Return wall clock time.
 gmshLoggerGetWallTime :: IO(Double)
 gmshLoggerGetWallTime = do
    alloca $ \errptr -> do
@@ -5355,6 +6712,8 @@ foreign import ccall safe "gmshc.h gmshLoggerGetWallTime"
    cgmshLoggerGetWallTime
       :: Ptr CInt
       -> IO(CDouble)
+
+-- Return CPU time.
 gmshLoggerGetCpuTime :: IO(Double)
 gmshLoggerGetCpuTime = do
    alloca $ \errptr -> do

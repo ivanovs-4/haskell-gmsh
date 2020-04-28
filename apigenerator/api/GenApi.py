@@ -16,6 +16,9 @@
 #
 
 
+import textwrap
+
+
 def haskellify_default_value(value, pyvalue):
     """ Take the C-default value and pyvalue and convert them to
     a haskell value. Haskell is a bit silly with negative numbers,
@@ -558,6 +561,15 @@ def camelcasify(str):
 def flatten2(lst):
     return [x for xs in lst for x in xs]
 
+def format_comment(text):
+    return textwrap.fill( text
+                        , initial_indent = "-- "
+                        , subsequent_indent = "-- "
+                        , break_long_words = False
+                        , break_on_hyphens = False
+                        # , width = 70
+                        )
+
 class Function:
     def __init__(self, rtype, name, args, doc, special=[]):
         self.return_type = rtype
@@ -567,9 +579,12 @@ class Function:
         self.special = special
 
     def to_string(self, prefix):
-        return "\n".join([self.str_type_signature(prefix),
-                          self.str_body(prefix),
-                          self.str_foreignexp(prefix)])
+        return "\n".join([""
+                         ,format_comment(self.doc)
+                         ,self.str_type_signature(prefix)
+                         ,self.str_body(prefix)
+                         ,self.str_foreignexp(prefix)
+                         ])
 
     def input_arguments(self):
         return [a for a in self.args if not a.output]
@@ -792,6 +807,11 @@ class Module:
         else:
             prefix = kwprefix+camelcasify(self.name)
             fwd_kwargs['prefix'] = prefix
+
+
+        comment = format_comment(self.doc)
+        comment_row = "".join("-" for j in range(len(comment.splitlines()[0])))
+        fhandle.write("\n".join(["", "", comment_row, comment, comment_row, ""]))
 
         for f in self.fs:
             fhandle.write(f.to_string(prefix))
